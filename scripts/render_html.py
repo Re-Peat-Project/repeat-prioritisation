@@ -2,11 +2,11 @@
 """Question: does a generated HTML page draw correctly and run without JavaScript errors?
 
 Renders a page with headless Chrome or Edge to a PNG and prints any console errors, so the explanatory pages
-(docs/subkhg_process.html, docs/neraca_air_process.html) can be checked without opening a browser.
+(docs/process/subkhg_process.html, docs/process/neraca_air_process.html) can be checked without opening a browser.
 
-  python scripts/render_html.py docs/subkhg_process.html data_local/shots/subkhg.png --height 3600
-  python scripts/render_html.py docs/neraca_air_process.html data_local/shots/neraca_dark.png --dark
-  python scripts/render_html.py docs/subkhg_process.html data_local/shots/map.png --crop 30,1740,960,2330
+  python scripts/render_html.py docs/process/subkhg_process.html data_local/shots/subkhg.png --height 3600
+  python scripts/render_html.py docs/process/neraca_air_process.html data_local/shots/neraca_dark.png --dark
+  python scripts/render_html.py docs/process/subkhg_process.html data_local/shots/map.png --crop 30,1740,960,2330
 
 --crop x0,y0,x1,y1 cuts a region (pixels of the full render) out of the screenshot. Needs Chrome or Edge installed.
 """

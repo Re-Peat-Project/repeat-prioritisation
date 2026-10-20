@@ -129,7 +129,7 @@ Units with no row in the table get no value for that indicator, and the group sc
 
 With 6–30 units per KHG, treat the tertiles and validation as indicative.
 
-## Outputs (`out_prioritas/`)
+## Outputs (`var/out/`)
 
 `unit_prioritas.gpkg` / `.csv` (every unit: indicators, normalised `n_*`, group scores, `kelas`, `peringkat`, sensitivity), `kebutuhan_sekat.csv` (blocks needed, existing and additional per KHG and class), `peta_prioritas_<khg>.png`, `ringkasan_kelas.csv`, `korelasi_indikator.csv`, `laporan.json`.
 

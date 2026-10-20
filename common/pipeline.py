@@ -35,7 +35,7 @@ DEFAULTS = {
     "dry_months": [6, 7, 8, 9, 10],
     "ndmi_months": [8, 9, 10],
     "cache_dir": "cache",
-    "out": "out_prioritas",
+    "out": "var/out",
     "sources": copy.deepcopy(SRC.SOURCE_DEFAULTS),
     "vectors": {"canals": None, "rivers": None, "lakes": None, "roads": None, "settlements": None,
                 "protected": {"path": None, "field": None, "values": ["lindung"]},
