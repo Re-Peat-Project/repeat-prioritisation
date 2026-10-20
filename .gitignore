@@ -1,0 +1,31 @@
+# environments and caches
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# run outputs and fetched data (rebuilt by the pipeline)
+cache/
+cache_*/
+out/
+out_*/
+output/
+*.log
+
+# your own configs (the examples in configs/ are tracked)
+configs/local/
+config.yaml
+config.*.yaml
+
+# large test inputs (the small KHG files in test_data/ are tracked)
+test_pulau_padang/data/
+test_pulau_padang/output/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# local inputs prepared from your own data (clipped copies)
+data_local/

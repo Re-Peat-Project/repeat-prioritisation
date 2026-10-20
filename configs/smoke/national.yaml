@@ -1,0 +1,10 @@
+# National ranking of three small KHG, 2021 only. Fetches its layers (about 3 minutes); rainfall is off to keep it fast.
+#   python -m national.run --config configs/smoke/national.yaml
+khg: test_data/khg_small.gpkg
+khg_id_field: khg_id
+years: {baseline: [2021, 2021], validation: [], elnino: []}
+sources:
+  era5: {enabled: false}
+cache_dir: cache_smoke
+out: out_smoke/national
+maps: false

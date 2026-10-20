@@ -1,0 +1,209 @@
+khg: null
+khg_id_field: khg_id
+khg_filter: []
+units:
+  mode: vector                     # sub-KHG polygons from repeat-delineation (subkhg_units.gpkg)
+  hex_area_km2: 1.0
+  min_fraction: 0.2
+  path: path/to/subkhg_units.gpkg
+  id_field: unit_id
+  subkhg: {}
+grid_res_m: 30
+years:
+  baseline:
+  - 2015
+  - 2022
+  validation:
+  - 2023
+  elnino:
+  - 2015
+  - 2019
+  - 2023
+  all:
+  - 2015
+  - 2016
+  - 2017
+  - 2018
+  - 2019
+  - 2020
+  - 2021
+  - 2022
+  - 2023
+dry_months:
+- 6
+- 7
+- 8
+- 9
+- 10
+ndmi_months:
+- 8
+- 9
+- 10
+cache_dir: cache
+out: out_prioritas
+sources:
+  stac_url: https://planetarycomputer.microsoft.com/api/stac/v1
+  planetary_computer: true
+  ndmi:
+    enabled: true
+    local: null
+    collection: sentinel-2-l2a
+    bands:
+      nir: B8A
+      swir: B11
+      scl: SCL
+      red: B04
+    res_m: 20
+    ndvi: true
+    ndvi_local: null
+    max_cloud: 60
+    scl_keep:
+    - 4
+    - 5
+    - 6
+    - 7
+    apply_boa_offset: true
+  burned:
+    enabled: true
+    local: null
+    collection: modis-64A1-061
+    asset: Burn_Date
+  deficit:
+    enabled: true
+    local: null
+    collection: terraclimate
+    variable: def
+    fallback: era5
+    monthly_variables:
+    - ppt
+    - aet
+    monthly_local: null
+  era5:
+    enabled: false
+    local: null
+    url: https://storage.googleapis.com/gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3
+    variable: total_precipitation
+    months: null
+    dry_day_mm: 1.0
+    spell_days: 14
+    workers: 8
+    retries: 6
+    evap_stride: 3
+  chirps:
+    enabled: false
+    local: null
+    url: https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/cogs/p05/{year}/chirps-v2.0.{year}.{month:02d}.{day:02d}.cog
+    dry_day_mm: 1.0
+    spell_days: 14
+    workers: 8
+  worldcover:
+    enabled: true
+    local: null
+    collection: esa-worldcover
+    asset: map
+  water:
+    enabled: true
+    local: null
+    collection: jrc-gsw
+    asset: seasonality
+  firms:
+    enabled: true
+    local: null
+    url: https://firms.modaps.eosdis.nasa.gov/data/country/viirs-snpp/{year}/viirs-snpp_{year}_Indonesia.csv
+    confidence:
+    - n
+    - h
+    exclude_types:
+    - 2
+    - 3
+vectors:
+  canals: null
+  rivers: null
+  lakes: null
+  roads: null
+  settlements: null
+  protected:
+    path: null
+    field: null
+    values:
+    - lindung
+  blocks: null
+  tidal: null
+  concessions:
+    path: null
+    type_field: null
+    exclude_types:
+    - IUP
+  tma_csv: null
+tma:
+  path: null
+  kinds:
+  - concession
+  drop_flags:
+  - range
+  - spike
+  min_coverage: 0.5
+  period: null
+rasters:
+  peat_depth: null
+  dtm: null
+extra_indicators: []
+params:
+  peat_depth_scale: 1.0
+  l_inf_m: 200
+  l_inf_burnt_m: 60
+  water_min_months: 10
+  exposure_m: 2000
+  forest_classes:
+  - 10
+  - 95
+  tma_threshold_m: 0.4
+  tma_depth_positive: null
+  tma_max_gap_days: 10
+  runoff_coefficient: 0.12
+  interception_by_class:
+    '10': 0.164
+    '95': 0.164
+    '20': 0.08
+    '90': 0.05
+    '30': 0.03
+    '40': 0.03
+  water_content_natural: 0.8
+  water_content_canalised: 0.7
+  ipg_dA_m: 0.4
+  ipg_category: A
+  ipg_js_min_m: 50
+  ipg_js_max_m: 2000
+  ipg_canal_class_field: null
+  ipg_canal_classes:
+  - primer
+  - sekunder
+  - primary
+  - secondary
+indicators: {}
+ahp: {}
+scoring:
+  alpha_urgency: 0.8
+  normalise_quantiles:
+  - 0.05
+  - 0.95
+  fixed_thresholds: null
+  correlation_warn: 0.8
+  min_units_per_indicator: 20
+  sensitivity_runs: 300
+  sensitivity_concentration: 20
+  top_fraction: 0.2
+  validation_burn_threshold: 0.05
+  seed: 42
+  normalise_scope: khg
+  tidal_mode: downweight
+  tidal_factor: 0.7
+  method: need
+  ranksum_weights: {}
+  ranksum_directions: {}
+  ranksum_columns: {}
+  national: false
+  top_n: 10
+maps: true
+level: subkhg
+
