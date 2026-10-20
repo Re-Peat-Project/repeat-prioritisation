@@ -17,7 +17,7 @@ Two separate programs answer two different questions about peat rewetting. They 
 configs/    example configs (national, subkhg), small smoke-test configs (configs/smoke/), your own go in configs/local/. The real-site configs (Kampar - Gaung, Sugihan - Lumpur) are in the hub: re-peat/sites/<khg>/
 docs/       data_sources.md: providers (incl. BMKG), what was tested, ERA5 notes; prior_method.md: the team's earlier rank-sum method
             the real-data runbooks and reports moved to the hub: re-peat/sites/<khg>/
-test_data/  small test inputs: KHG polygons and a prefetched 2021 cache for one KHG
+tests/fixtures/  small test inputs: KHG polygons and a prefetched 2021 cache for one KHG
 common/     the prioritisation engine: indicators, scoring functions, pipeline. Grid, sources, tma and htmlkit now live in the repeat-common repo (import repeat_common); docs/data_sources.md lists the providers
 national/   run.py                                national entry point and preset
 subkhg/     run.py                                sub-KHG entry point and preset
@@ -161,7 +161,7 @@ python -m subkhg.run --config configs/local/subkhg.yaml --fetch-only        # ju
 python -m subkhg.run --config configs/local/subkhg.yaml --skip-fetch        # re-score from cache (e.g. new weights)
 ```
 
-Run from the repo root. Both programs accept `--config`, `--khg`, `--out`, `--fetch-only` and `--skip-fetch`. `configs/national.example.yaml` and `configs/subkhg.example.yaml` hold the defaults of each program; put your own in `configs/local/` (not tracked). Set `khg` in the sub-KHG config to `khg_terpilih.gpkg` to continue from the national shortlist.
+Run from the repo root. Both programs accept `--config`, `--khg`, `--out`, `--fetch-only` and `--skip-fetch`. `configs/examples/national.example.yaml` and `configs/examples/subkhg.example.yaml` hold the defaults of each program; put your own in `configs/local/` (not tracked). Set `khg` in the sub-KHG config to `khg_terpilih.gpkg` to continue from the national shortlist.
 
 `params.peat_depth_scale` turns the peat depth raster into metres (default 1). A raster in centimetres needs `0.01`; the water stock indicator is in metres.
 
@@ -245,7 +245,7 @@ message. Every analysis behind a number in the docs is a command in the repo (se
 
 ### Smoke tests
 
-Each program runs on its own on the small inputs in `test_data/`. Outputs go to `out_smoke/`, which git ignores.
+Each program runs on its own on the small inputs in `tests/fixtures/`. Outputs go to `var/out/smoke/`, which git ignores.
 
 ```bash
 python -m subkhg.run --config configs/smoke/subkhg.yaml --skip-fetch                # 49 hexagons in a Riau KHG, from the prefetched cache, ~10 s

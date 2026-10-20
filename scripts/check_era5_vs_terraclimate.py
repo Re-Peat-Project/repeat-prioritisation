@@ -6,7 +6,7 @@ evaporation and deficit from ERA5 (repeat_common.sources.era5_water_balance) and
 layers in that KHG's cache. On the Riau test KHG, August 2021: evaporation 113 mm (ERA5) against 112 mm, rain 224 mm
 against 184 mm, deficit 11 mm against 0. It reads about 1,240 hourly ERA5 fields (about 2 minutes).
 
-  python scripts/check_era5_vs_terraclimate.py --khg test_data/khg_small.gpkg --khg-id 72 --cache test_data/prefetched/72 --year 2021 --month 8
+  python scripts/check_era5_vs_terraclimate.py --khg tests/fixtures/khg_small.gpkg --khg-id 72 --cache tests/fixtures/prefetched/72 --year 2021 --month 8
 """
 import argparse
 import logging

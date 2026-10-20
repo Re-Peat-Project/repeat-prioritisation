@@ -2,16 +2,16 @@ khg: null
 khg_id_field: khg_id
 khg_filter: []
 units:
-  mode: khg
+  mode: vector                     # sub-KHG polygons from repeat-delineation (subkhg_units.gpkg)
   hex_area_km2: 1.0
   min_fraction: 0.2
-  path: null
+  path: path/to/subkhg_units.gpkg
   id_field: unit_id
   subkhg: {}
-grid_res_m: 250
+grid_res_m: 30
 years:
   baseline:
-  - 2016
+  - 2015
   - 2022
   validation:
   - 2023
@@ -40,12 +40,12 @@ ndmi_months:
 - 9
 - 10
 cache_dir: cache
-out: out_prioritas
+out: var/out
 sources:
   stac_url: https://planetarycomputer.microsoft.com/api/stac/v1
   planetary_computer: true
   ndmi:
-    enabled: false
+    enabled: true
     local: null
     collection: sentinel-2-l2a
     bands:
@@ -79,7 +79,7 @@ sources:
     - aet
     monthly_local: null
   era5:
-    enabled: true
+    enabled: false
     local: null
     url: https://storage.googleapis.com/gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3
     variable: total_precipitation
@@ -180,40 +180,30 @@ params:
   - sekunder
   - primary
   - secondary
-indicators:
-  f_reach:
-    weight: 0
-  f_lift:
-    weight: 0
-  f_access:
-    weight: 0
-  u_ipg_gap:
-    weight: 0
-  f_water_dist:
-    weight: 0
+indicators: {}
 ahp: {}
 scoring:
-  alpha_urgency: 0.6
+  alpha_urgency: 0.8
   normalise_quantiles:
   - 0.05
   - 0.95
   fixed_thresholds: null
   correlation_warn: 0.8
   min_units_per_indicator: 20
-  sensitivity_runs: 0
+  sensitivity_runs: 300
   sensitivity_concentration: 20
   top_fraction: 0.2
   validation_burn_threshold: 0.05
   seed: 42
-  normalise_scope: all
+  normalise_scope: khg
   tidal_mode: downweight
   tidal_factor: 0.7
   method: need
   ranksum_weights: {}
   ranksum_directions: {}
   ranksum_columns: {}
-  national: true
+  national: false
   top_n: 10
 maps: true
-level: khg
+level: subkhg
 

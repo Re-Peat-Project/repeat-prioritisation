@@ -6,6 +6,7 @@ __pycache__/
 
 # run outputs and fetched data (rebuilt by the pipeline)
 cache/
+var/
 cache_*/
 out/
 out_*/
@@ -17,7 +18,7 @@ configs/local/
 config.yaml
 config.*.yaml
 
-# large test inputs (the small KHG files in test_data/ are tracked)
+# large test inputs (the small KHG files in tests/fixtures/ are tracked)
 test_pulau_padang/data/
 test_pulau_padang/output/
 

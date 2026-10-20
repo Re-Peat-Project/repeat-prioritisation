@@ -2,7 +2,7 @@
 """Build the HTML page that explains sub-KHG delineation and prioritisation and shows a run's outputs on a map.
 
   python -m subkhg.dashboard --subkhg-config ../re-peat/sites/kampar_gaung/subkhg.yaml \\
-      --neraca-config ../re-peat/sites/kampar_gaung/neraca_experiments.yaml --out docs/subkhg_process.html
+      --neraca-config ../re-peat/sites/kampar_gaung/neraca_experiments.yaml --out docs/process/subkhg_process.html
 
 One self-contained file (no server, no internet): the process diagram with the numbers of the run, the delineation funnel,
 a map of the sub-KHG coloured by any output or indicator (with canals, rivers, canal blocks and water-table stations as
@@ -371,7 +371,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--subkhg-config", required=True)
     ap.add_argument("--neraca-config")
-    ap.add_argument("--out", default="docs/subkhg_process.html")
+    ap.add_argument("--out", default="docs/process/subkhg_process.html")
     a = ap.parse_args(argv)
     build(a.subkhg_config, a.neraca_config, a.out)
 
