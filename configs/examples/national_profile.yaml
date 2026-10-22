@@ -23,7 +23,10 @@ indicators:
   u_burn_repeat: {weight: 1.0}
   u_hotspot: {weight: 1.0}
   u_frp: {weight: 0.0}
-  u_canal_density: {weight: 1.0}
+  u_canal_density: {weight: 0.0}   # all canals together: reported, not scored
+  u_canal_primary: {weight: 0.5}   # canal km per km2 of KHG, by class (KODE_KANAL 1, 2, 3); the three weights add to 1, as the single canal weight did
+  u_canal_secondary: {weight: 0.3}
+  u_canal_tertiary: {weight: 0.2}
   u_hotspot_now: {weight: 1.0}   # this year's hotspots (KLH, Jan-Sep 2026), per km2 of peat; its own weight (0 drops it); standalone rank: peringkat_now
   u_burned_now: {weight: 0.0}    # this year's burned share of the peat: reported, not scored
   i_peat_depth: {weight: 0.0}   # peat map covers 89 of 865 KHG: reported, not scored

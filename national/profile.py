@@ -70,7 +70,10 @@ DEFAULTS = {
         "u_burn_repeat": {"weight": 1.0},    # share burned two or more times in the baseline
         "u_hotspot": {"weight": 1.0},        # hotspots per km2 per year
         "u_frp": {"weight": 0.0},            # FRP per km2 per year: reported, not scored (rho 0.99 with u_hotspot)
-        "u_canal_density": {"weight": 1.0},  # canal km per km2
+        "u_canal_density": {"weight": 0.0},  # all canals together: reported; the three classes below are scored
+        "u_canal_primary": {"weight": 0.5},   # canal km per km2 of KHG by class; the three weights add to 1, the old single canal weight
+        "u_canal_secondary": {"weight": 0.3},
+        "u_canal_tertiary": {"weight": 0.2},
         "i_peat_depth": {"weight": 0.0},     # coverage incomplete: reported, not scored
         "u_hotspot_now": {"weight": 1.0},    # hotspots this year (KLH, Jan-Sep) per km2 of peat; its own weight, set 0 to drop it
         "u_burned_now": {"weight": 0.0},     # burned share of the peat this year (BA_<year>): reported, not scored
@@ -303,17 +306,22 @@ def hotspots_now(path, khg, ncfg, sampler=None):
                  "n_kept": int(pts["keep"].sum()), "months": sorted(pts["month"].unique().tolist())}
 
 
+CANAL_CLASS = {"1": "primary", "2": "secondary", "3": "tertiary"}   # KODE_KANAL: Kanal Primer, Sekunder, Tersier
+
+
 def canal_length(path, khg):
+    """Canal km inside each KHG, total and by class (primary, secondary, tertiary), and the number of segments."""
     rows = []
     for r in khg.itertuples():
-        g = _read_mask(path, r.geometry, columns=[])
+        g = _read_mask(path, r.geometry, columns=["KODE_KANAL"])
         if g.empty:
-            rows.append((r.khg_id, 0.0, 0))
+            rows.append((r.khg_id, 0.0, 0, 0.0, 0.0, 0.0))
             continue
         g = g.to_crs(AEA)
-        length = shapely.length(shapely.intersection(shapely.make_valid(g.geometry.values), r.geom_aea)).sum() / 1000
-        rows.append((r.khg_id, float(length), len(g)))
-    return pd.DataFrame(rows, columns=["khg_id", "canal_km", "canal_segments"])
+        km = shapely.length(shapely.intersection(shapely.make_valid(g.geometry.values), r.geom_aea)) / 1000
+        code = g["KODE_KANAL"].astype(str).to_numpy()
+        rows.append((r.khg_id, float(km.sum()), len(g), *(float(km[code == k].sum()) for k in ("1", "2", "3"))))
+    return pd.DataFrame(rows, columns=["khg_id", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary"])
 
 
 def count_inside(path, khg, name, rep="point"):
@@ -394,7 +402,7 @@ def build_profile(cfg, only=None):
             prof = prof.merge(t, on="khg_id", how="left")
     if tma is not None:
         prof["n_tma_stations"] = prof["n_tma_stations"].fillna(0)
-    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "n_infra_ada", "n_desa_target"):
+    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary", "n_infra_ada", "n_desa_target"):
         prof[c] = prof[c].fillna(0)
     A = prof["area_km2"]
     if sampler is not None:
@@ -440,7 +448,10 @@ def build_profile(cfg, only=None):
         if ycur in by.columns:
             prof["u_burned_now"] = by[ycur].to_numpy() / D
     # no canal in the layer = not mapped (OSM-derived, patchy), not "no canals": leave it missing so it is not scored
-    prof["u_canal_density"] = (prof["canal_km"] / A).where(prof["canal_segments"] > 0)
+    mapped = prof["canal_segments"] > 0
+    prof["u_canal_density"] = (prof["canal_km"] / A).where(mapped)
+    for cls in ("primary", "secondary", "tertiary"):
+        prof[f"u_canal_{cls}"] = (prof[f"canal_km_{cls}"] / A).where(mapped)
     prof["i_peat_depth"] = prof["peat_depth_mean_cm"] / 100        # m, only where the peat map covers the KHG
     prof["peat_cover_frac"] = (prof["peat_depth_km2"] / A).clip(upper=1)
     prof["v_burned_frac"] = (span(by, *yv).sum(axis=1).to_numpy() / nv) / D

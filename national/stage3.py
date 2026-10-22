@@ -8,8 +8,8 @@
 CFG is configs/examples/national_stage3.yaml (the engine's config plus the keys below). Dry spells from ERA5 are not used:
 the hourly store is slow to read and 25 km is too coarse to tell neighbouring KHG apart.
 
-Added config keys:  stage3: {profile: <dir with operational/profile.gpkg>, top: 25, peat_extent: <GFW tif>,
-                             peat_global: <Global Peatland Map tif>}
+Added config keys:  stage3: {profile: <dir with operational/profile.gpkg>, top: 25, selected: <selected_khg.csv>,
+                             peat_extent: <GFW tif>, peat_global: <Global Peatland Map tif>}
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ log = logging.getLogger("prioritas.stage3")
 
 WORLDCOVER = {10: "tree", 20: "shrub", 30: "grass", 40: "crop", 50: "built", 60: "bare", 70: "snow", 80: "water",
               90: "wetland", 95: "mangrove", 100: "moss"}
-DEFAULT = {"stage3": {"top": 25, "peat_extent": None, "peat_global": None, "profile": None}}
+DEFAULT = {"stage3": {"top": 25, "peat_extent": None, "peat_global": None, "profile": None, "selected": None}}
 
 
 def load_cfg(path):
@@ -60,6 +60,12 @@ def select(cfg, top=None):
     top = top or cfg["stage3"]["top"]
     g = gpd.read_file(profile_dir(cfg) / "operational" / "profile.gpkg")
     t = g[g.skor_risiko.notna()].sort_values("peringkat").head(top)
+    sel = cfg["stage3"].get("selected")            # the team's selected KHG (re-peat/sites/selected_khg.csv): always profiled
+    if sel and Path(sel).exists():
+        names = {P.norm_name(n) for n in pd.read_csv(sel).fillna("")["khg_name_in_gpkg"] if n}
+        extra = g[g["nama"].map(P.norm_name).isin(names) & ~g.khg_id.isin(t.khg_id)]
+        log.info("%d selected KHG added to the top %d", len(extra), top)
+        t = pd.concat([t, extra])
     out = Path(cfg["khg"])
     out.parent.mkdir(parents=True, exist_ok=True)
     t[["khg_id", "nama", "province", "area_km2", "peringkat", "geometry"]].to_file(out, driver="GPKG")

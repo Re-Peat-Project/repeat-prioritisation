@@ -30,5 +30,6 @@ maps: false
 scoring: {sensitivity_runs: 0, top_n: 25}
 stage3:
   top: 25
+  selected: ${REPEAT_HUB}/sites/selected_khg.csv   # the team's KHG are profiled whatever their rank
   peat_extent: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif      # python -m repeat_common.fetch_peat_extent
   peat_global: ${REPEAT_DATA}/peat_extent_gpm2022_1km.tif            # Global Peatland Map 2.0, cross-check

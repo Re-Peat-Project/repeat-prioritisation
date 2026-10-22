@@ -51,7 +51,7 @@ It is the Python alternative to a GEE workflow: layers are read from cloud-nativ
 
 ## National profile from local layers
 
-`python -m national.profile` and `python -m national.report` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an HTML report. They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m tests.test_national_profile`.
+`python -m national.profile` and `python -m national.dashboard` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an interactive dashboard (D3, vendored in `national/assets`). They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m tests.test_national_profile`.
 
 ## Sub-KHG program
 

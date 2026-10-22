@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peat KHG priority</title>
+<style>/*MLCSS*/</style>
+<style>/*CSS*/</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1 data-i18n="Peat KHG priority">Peat KHG priority</h1>
+    <p class="sub" id="sub"></p>
+  </div>
+  <div class="top-actions">
+    <span class="seg" id="lang"></span>
+    <button type="button" id="notes-btn" class="ghost" data-i18n="Notes">Notes</button>
+    <button type="button" id="theme-btn" class="ghost" data-i18n="Theme">Theme</button>
+  </div>
+</header>
+
+<section class="bar" id="filters" aria-label="Filters">
+  <div class="ctl"><span class="lab" data-i18n="Presets">Presets</span><span id="presets" class="seg"></span></div>
+  <div class="ctl"><span class="lab" data-i18n="Min peat">Min peat</span><input type="range" id="minpeat" min="0" max="500" step="5"><output id="minpeat-o"></output></div>
+  <div class="ctl"><span class="lab" data-i18n="Island">Island</span><span id="islands" class="seg"></span></div>
+  <div class="ctl"><span class="lab" data-i18n="No canals mapped">No canals mapped</span><span id="missing" class="seg"></span></div>
+  <div class="ctl"><span class="lab" data-i18n="List">List</span><span id="view" class="seg"></span></div>
+</section>
+
+<main class="grid">
+  <aside class="card" id="controls"><h2 data-i18n="Weights">Weights</h2><div id="sliders"></div>
+    <button type="button" id="reset" class="ghost wide" data-i18n="Reset weights">Reset weights</button>
+  </aside>
+
+  <section class="card" id="rank">
+    <div class="card-h"><h2 id="rank-title">Ranking</h2>
+      <span class="seg" id="rank-mode"></span></div>
+    <div class="legend-row" id="rank-legend"></div>
+    <div id="rank-list" class="rank-list"></div>
+    <div id="rank-table" class="tablewrap" hidden></div>
+  </section>
+
+  <section class="side">
+    <div class="card" id="mapcard">
+      <div class="card-h"><h2 data-i18n="Map">Map</h2><span class="seg" id="zoom-btns"></span></div>
+      <div id="map" role="img" aria-label="Map of KHG coloured by score"></div>
+      <div class="map-legend" id="map-legend"></div>
+    </div>
+    <div class="card" id="bumpcard">
+      <div class="card-h"><h2 data-i18n="Rank shift">Rank shift</h2><span class="hint" id="bump-hint"></span></div>
+      <svg id="bump" role="img" aria-label="Rank at default weights against rank at your weights"></svg>
+    </div>
+  </section>
+</main>
+
+<section class="card profile" id="profile">
+  <div class="card-h"><div><h2 id="p-name">Profile</h2><div class="chips" id="p-chips"></div></div>
+    <label class="pick"><span data-i18n="KHG">KHG</span> <select id="p-pick"></select></label></div>
+  <div class="kpis" id="p-kpis"></div>
+  <div class="p-grid">
+    <div class="p-map"><div class="map-tools" id="p-tools"></div><div id="p-map"></div><div class="foot" id="p-foot"></div></div>
+    <div class="p-right">
+      <div id="p-strips"></div>
+      <div class="charts" id="p-charts"></div>
+    </div>
+  </div>
+  <details class="data"><summary data-i18n="Data table">Data table</summary><div id="p-table" class="tablewrap"></div></details>
+</section>
+
+<dialog id="notes"><div class="dlg">
+  <button type="button" class="ghost close" id="notes-close" data-i18n="Close">Close</button>
+  <h2 data-i18n="Notes">Notes</h2><ul id="notes-list"></ul>
+</div></dialog>
+
+<div id="tip" role="tooltip"></div>
+<script>/*D3*/</script>
+<script>/*ML*/</script>
+<script>/*DATA*/</script>
+<!--PROFILES-->
+<script>/*JS*/</script>
+</body>
+</html>

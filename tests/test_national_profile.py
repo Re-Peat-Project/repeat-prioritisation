@@ -14,6 +14,9 @@ def _prof(n=90, seed=1):
         "khg_id": [f"K{i}" for i in range(n)], "area_km2": np.where(np.arange(n) % 10 == 0, 20.0, 500.0),
         "u_fire_freq": fire, "u_burn_repeat": fire / 2, "u_hotspot": fire * 20,
         "u_canal_density": np.where(np.arange(n) % 7 == 0, np.nan, rng.uniform(0, 5, n)),
+        "u_canal_primary": np.where(np.arange(n) % 7 == 0, np.nan, rng.uniform(0, 1, n)),
+        "u_canal_secondary": np.where(np.arange(n) % 7 == 0, np.nan, rng.uniform(0, 2, n)),
+        "u_canal_tertiary": np.where(np.arange(n) % 7 == 0, np.nan, rng.uniform(0, 3, n)),
         "v_burned_frac": fire, "v_hotspot": fire * 10, "geometry": [None] * n})
 
 
@@ -29,7 +32,7 @@ def test_rank():
     assert (ranked.loc[ranked.skor_risiko <= 0, "kelas"] == "Fokus nasional: rendah").all()   # no fire signal is always Low
     top = ranked.sort_values("peringkat")
     assert top.kelas.iloc[0] == "Fokus nasional: tinggi" and top.skor_risiko.is_monotonic_decreasing
-    assert ranked[ranked.u_canal_density.isna()].skor_risiko.notna().all()                       # missing canals are not scored, not zero
+    assert ranked[ranked.u_canal_primary.isna()].skor_risiko.notna().all()                       # missing canals are not scored, not zero
     assert rep["n_ranked"] == len(ranked) and "p_fokus_tinggi" in ranked
     out2, rep2 = P.rank(prof, cfg, "operational")
     assert rep2["validation"] == {} and out2.skor_risiko.notna().sum() == len(ranked)
