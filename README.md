@@ -49,6 +49,10 @@ The stages exchange files: the `repeat-delineation` repository writes `subkhg_un
 
 It is the Python alternative to a GEE workflow: layers are read from cloud-native sources (STAC + COG/Zarr), so only each KHG's window is transferred, and every step runs locally.
 
+## National profile from local layers
+
+`python -m national.profile` and `python -m national.report` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an HTML report. They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m tests.test_national_profile`.
+
 ## Sub-KHG program
 
 Delineation, the need ranking and its indicators are described in [subkhg/README.md](subkhg/README.md). The sections below describe the shared engine and the national ranking. Where the sub-KHG program differs, they say so.

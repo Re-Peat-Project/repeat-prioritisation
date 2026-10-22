@@ -1,0 +1,34 @@
+# Stage 3: the cloud-data layers (climate, land cover, surface water, optionally NDMI) for the shortlisted KHG, using the
+# national engine on the top-N boundaries written by `python -m national.stage3 select`.
+#   python -m national.run --config configs/examples/national_stage3.yaml --fetch-only   # fetch the layers
+#   python -m national.stage3 summarize --config configs/examples/national_stage3.yaml
+# Environment: REPEAT_DATA, REPEAT_WORK (= re-peat/reports), SITMAT_PROCESSED.
+khg: ${REPEAT_WORK}/national_profile/stage3/top25_khg.gpkg
+khg_id_field: khg_id
+cache_dir: ${REPEAT_WORK}/national_profile/stage3/cache
+out: ${REPEAT_WORK}/national_profile/stage3/engine
+grid_res_m: 250
+years:
+  baseline: [2015, 2021]       # TerraClimate ends 2021 (the ERA5 fallback is off)
+  validation: []
+  elnino: [2015, 2019]
+dry_months: [6, 7, 8, 9, 10]
+ndmi_months: [8, 9, 10]
+sources:
+  era5: {enabled: false}                 # not used: slow hourly reads, and 25 km cannot tell neighbouring KHG apart
+  deficit: {fallback: null}
+  ndmi: {enabled: false, res_m: 100}     # Sentinel-2 dry-season NDMI: heavy; switch on after the core layers work
+  burned: {enabled: false}               # burned area and hotspots come from the local layers (national.profile)
+  firms: {enabled: false}
+vectors:
+  canals: ${REPEAT_DATA}/kanal_osgm_khg_existing_Indonesia.gpkg
+  rivers: ${REPEAT_DATA}/RBI_sungai.gpkg
+  lakes: ${REPEAT_DATA}/RBI_wadukdanau.gpkg
+  blocks: ${REPEAT_DATA}/infrastruktur_hidrologis_existing_BRGM_Indonesia.gpkg
+tma: {path: "${SITMAT_PROCESSED}", min_coverage: 0.3}
+maps: false
+scoring: {sensitivity_runs: 0, top_n: 25}
+stage3:
+  top: 25
+  peat_extent: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif      # python -m repeat_common.fetch_peat_extent
+  peat_global: ${REPEAT_DATA}/peat_extent_gpm2022_1km.tif            # Global Peatland Map 2.0, cross-check

@@ -1,0 +1,29 @@
+# National KHG profile and ranking from local layers: python -m national.profile --config configs/examples/national_profile.yaml
+# Environment: REPEAT_DATA (the _data folder), REPEAT_WORK (outputs), REPEAT_HUB (the re-peat repository),
+# SITMAT_PROCESSED (repeat-sitmat/sitmat_out/processed). Weights are provisional: agree them with the team.
+data: ${REPEAT_DATA}
+out: ${REPEAT_WORK}/national_profile
+registry: ${REPEAT_HUB}/sites/khg_registry.csv      # python tools/parse_kepmen_khg.py in re-peat
+years:
+  baseline: [2015, 2022]      # indicators; `--mode operational` extends it to the end of `validation`
+  validation: [2023, 2025]    # held-out years in `--mode validate`
+now:                                     # KLH-curated current-year hotspots (MODIS, monthly layers; _data_hotspot_Januari_September_2026.gpkg)
+  levels: [medium, high]                 # Rendah/Low dropped; Sedang/Medium and Tinggi/High kept
+  year: 2026
+hotspots: {confidence: [n, h], types: [0]}   # FIRMS VIIRS: drop low confidence (l) and non-vegetation-fire types
+peat:
+  extent: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif   # python -m repeat_common.fetch_peat_extent (GFW composite peat extent: union of Miettinen et al. 2016 and Gumbricht et al. 2017 for Indonesia)
+  global: ${REPEAT_DATA}/peat_extent_gpm2022_1km.tif   # Global Peatland Map 2.0, 1 km: independent cross-check (non-commercial licence)
+  basis: peat            # fire counted on peat only and divided by peat area; 'area' = per km2 of KHG, all land
+  min_peat_km2: 25       # KHG with less peat are profiled but not ranked
+min_area_km2: 50    # smaller KHG are profiled but not ranked: a handful of detections gives a huge density
+tma: {path: "${SITMAT_PROCESSED}", threshold_m: 0.4, min_days: 30}
+indicators:
+  u_fire_freq: {weight: 2.0}
+  u_burn_repeat: {weight: 1.0}
+  u_hotspot: {weight: 1.0}
+  u_frp: {weight: 0.0}
+  u_canal_density: {weight: 1.0}
+  u_hotspot_now: {weight: 1.0}   # this year's hotspots (KLH, Jan-Sep 2026), per km2 of peat; its own weight (0 drops it); standalone rank: peringkat_now
+  u_burned_now: {weight: 0.0}    # this year's burned share of the peat: reported, not scored
+  i_peat_depth: {weight: 0.0}   # peat map covers 89 of 865 KHG: reported, not scored
