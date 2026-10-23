@@ -27,3 +27,11 @@ season_months: [7, 8, 9, 10, 11]
 smoke_codes: [FU]            # METAR present weather: FU = smoke (HZ haze is shown separately, it is not specific to fire)
 low_vis_km: 5
 event_years: [2015, 2019, 2023, 2026]
+# satellite smoke/haze layers for the map, loaded by the viewer's browser from NASA GIBS (no key); one date at a time
+gibs:
+  url: https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/{layer}/default/{date}/{tms}/{z}/{y}/{x}.{ext}
+  layers:
+    - {id: truecolor, layer: VIIRS_NOAA20_CorrectedReflectance_TrueColor, tms: GoogleMapsCompatible_Level9, ext: jpg, maxzoom: 9, from: "2022-01-14",
+       title: "Satellite true colour (VIIRS NOAA-20)"}
+    - {id: aod, layer: MODIS_Combined_MAIAC_L2G_AerosolOpticalDepth, tms: GoogleMapsCompatible_Level7, ext: png, maxzoom: 7, from: "2002-09-15",
+       title: "Aerosol optical depth (MODIS MAIAC, 1 km)", legend: https://gibs.earthdata.nasa.gov/legends/MODIS_VIIRS_AOD_H.svg}

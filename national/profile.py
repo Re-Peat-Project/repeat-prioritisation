@@ -52,7 +52,7 @@ DEFAULTS = {
         "hotspots": "hotspot_viirs_snpp_2012_2025.gpkg",
         "canals": "kanal_osgm_khg_existing_Indonesia.gpkg",
         "blocks": "infrastruktur_hidrologis_existing_BRGM_Indonesia.gpkg",
-        "villages": "desa_target_pemulihan_ekosistem.gpkg",
+        "villages": "desa_target_pemulihan_ekosistem_gambut.gpkg",
         "peat_depth": "kedalaman_gambut_bbsdlp.gpkg",
         "hotspots_now": "_data_hotspot_Januari_September_2026.gpkg",   # KLH-curated MODIS hotspots of the current year, monthly layers
     },

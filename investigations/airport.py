@@ -218,7 +218,7 @@ def build(cfg):
         "coverage_sk": k.get("coverage", []),
         "kab_ok": bool(set(a for a in kab_in if a) <= set(k.get("coverage", []))),
         "brgm_named_detail": sorted({f"{j} {int(t) if pd.notna(t) else ''}".strip() for j, t in zip(named["Jenis"], named["Tahun"])}),
-        "feg2017_nearest_km": round(float(gpd.read_file(D / "FEG__Indonesia__2017__Rev_Tipologi.gpkg", bbox=(ext[0] - 1, ext[1] - 1, ext[2] + 1, ext[3] + 1))
+        "feg2017_nearest_km": round(float(gpd.read_file(D / "landstatus" / "FEG__Indonesia__2017__Rev_Tipologi.gpkg", bbox=(ext[0] - 1, ext[1] - 1, ext[2] + 1, ext[3] + 1))
                                           .to_crs(UTM).distance(rw_u).min() / 1000), 1),
         "metar_file": cfg["metar"],
     }
@@ -236,18 +236,20 @@ def build(cfg):
     v["day"] = (t + pd.Timedelta(hours=WITA)).dt.normalize()
     v = classify(v, khg_u, peat_u, gfw, rw_u, ctr_u)
     v = v[v["d_km"] <= reg_km]
+    v["high"] = v["confidence"].astype(str).str.lower() == "h"   # VIIRS nominal (n) is the medium level
     v["ring"] = ring_of(v["d_km"].to_numpy(), rk)
 
     n = gpd.read_file(D / P.DEFAULTS["inputs"]["hotspots_now"], bbox=reg_bb)
     n = n[n.geometry.notna() & ~n.geometry.is_empty].copy()
     lvl = n["C_LEVEL"].fillna(n["Kepercayaa"]).astype("string").str.lower().map(P.LEVEL)
-    n = n[lvl.isin(cfg["now"]["levels"])].copy()
+    n = n.assign(level=lvl)[lvl.isin(cfg["now"]["levels"])].copy()
     pop = n["PopupInfo"].astype(str).str.extract(r"Tanggal\s*:\s*(\d{1,2} \w{3} \d{4})")[0]
     n["day"] = pd.to_datetime(n["ACQ_DATE"]).dt.normalize().fillna(pd.to_datetime(pop, format="%d %b %Y", errors="coerce"))
     n["month"] = n["layer"].str[:2].astype(int)
     n = classify(n, khg_u, peat_u, gfw, rw_u, ctr_u)
     n = n[n["d_km"] <= reg_km]
     n["ring"] = ring_of(n["d_km"].to_numpy(), rk)
+    n["high"] = n["level"] == "high"
     far = rk[-1]
 
     def zone_table(df, key, zcol="zone"):
@@ -257,14 +259,29 @@ def build(cfg):
                                  for a in [f"{x}-{y}" for x, y in zip([0, *rk[:-1]], rk)] for b in ("peat", "mineral", "outside")},
                  "gfw": int(near[(near[key] == i) & near["gfw"]].shape[0])} for i in tab.index]
 
-    hot = {"viirs_year": zone_table(v, "year"), "now_month": zone_table(n, "month"),
-           "viirs_year_gfw": zone_table(v, "year", "zone_gfw"), "now_month_gfw": zone_table(n, "month", "zone_gfw"),
-           "viirs_month": v[v["d_km"] <= rk[1]].groupby(v["day"].dt.month).size().reindex(range(1, 13), fill_value=0).tolist(),
-           "sector_viirs": v[v["d_km"] <= rk[1]].groupby("sector").size().reindex(range(8), fill_value=0).tolist(),
-           "sector_now": n[n["d_km"] <= rk[1]].groupby("sector").size().reindex(range(8), fill_value=0).tolist(),
-           "nearest_now": None if n.empty else {"d_km": round(float(n["d_km"].min()), 2),
-                                                "day": str(n.loc[n["d_km"].idxmin(), "day"].date()) if pd.notna(n.loc[n["d_km"].idxmin(), "day"]) else None},
-           "now_last": str(n["day"].max().date()) if n["day"].notna().any() else None}
+    def summaries(v, n):
+        """Hotspot summaries for one confidence selection (all kept levels, or high only)."""
+        inside = n["zone"] != "outside"
+        return {"viirs_year": zone_table(v, "year"), "now_month": zone_table(n, "month"),
+                "viirs_year_gfw": zone_table(v, "year", "zone_gfw"), "now_month_gfw": zone_table(n, "month", "zone_gfw"),
+                "sector_viirs": v[v["d_km"] <= rk[1]].groupby("sector").size().reindex(range(8), fill_value=0).tolist(),
+                "sector_now": n[n["d_km"] <= rk[1]].groupby("sector").size().reindex(range(8), fill_value=0).tolist(),
+                "nearest_now": None if n.empty else {"d_km": round(float(n["d_km"].min()), 2),
+                                                     "day": str(n.loc[n["d_km"].idxmin(), "day"].date()) if pd.notna(n.loc[n["d_km"].idxmin(), "day"]) else None},
+                # the current year by distance and ground
+                "now_summary": {f"r{r}": int((n["d_km"] <= r).sum()) for r in rk} | {
+                    "khg": int(inside.sum()), "khg_peat_feg": int((n["zone"] == "peat").sum()), "khg_peat_gfw": int((n["zone_gfw"] == "peat").sum())}}
+
+    hot = summaries(v, n)
+    hot["high"] = summaries(v[v["high"]], n[n["high"]])
+    hot["now_last"] = str(n["day"].max().date()) if n["day"].notna().any() else None
+    hot["now_first"] = str(n["day"].min().date()) if n["day"].notna().any() else None
+    hot["levels"] = {"viirs": hc["confidence"], "now": cfg["now"]["levels"]}
+    # every current-year hotspot within the inner ring, with its level
+    near0 = n[n["d_km"] <= rk[0]].sort_values("d_km")
+    hot["now_near"] = [[None if pd.isna(d) else str(d.date()), round(float(dk), 2), z, z2, None if pd.isna(kab) else str(kab), str(lv), SECT[int(s)]]
+                       for d, dk, z, z2, kab, lv, s in zip(near0["day"], near0["d_km"], near0["zone"], near0["zone_gfw"],
+                                                           near0["KABKO_2023"], near0["level"], near0["sector"])]
 
     # --- burned area ------------------------------------------------------------------------------------------------
     ycols = [f"BA_{y}" for y in range(2015, 2027)]
@@ -319,8 +336,13 @@ def build(cfg):
     is26 = day.index.year == 2026
     day.loc[is26, "hs_near"] = nn_day.reindex(day.index[is26]).fillna(0).astype(int).to_numpy()
     day.loc[is26, "hs_reg"] = nr_day.reindex(day.index[is26]).fillna(0).astype(int).to_numpy()
+    for col, src_v, src_n in (("hs_near_high", v[(v["d_km"] <= far) & v["high"]], n[(n["d_km"] <= far) & n["high"]]),
+                              ("hs_reg_high", v[(v["d_km"] > far) & v["high"]], n[(n["d_km"] > far) & n["high"]])):
+        day[col] = src_v.groupby("day").size().reindex(day.index).fillna(0).astype(int)
+        day.loc[is26, col] = src_n.groupby("day").size().reindex(day.index[is26]).fillna(0).astype(int).to_numpy()
     day["smoke_day"] = day["smoke_obs"] > 0
     day["low_smoke"] = day["smoke_day"] & (day["vis_min"] < cfg["low_vis_km"])
+    day["smoke_lt1"] = day["smoke_day"] & (day["vis_min"] < 1)   # low visibility alone is often fog or rain; smoke days only
     lag = lambda s: (s | s.shift(1, freq="D").reindex(s.index).fillna(False))
     nd = lag(day["hs_near"] > 0)
     rd = lag(day["hs_reg"] > 0)
@@ -353,8 +375,9 @@ def build(cfg):
     yr = day.groupby(day.index.year).agg(obs=("obs", "sum"), days=("obs", "size"), smoke_days=("smoke_day", "sum"),
                                          low_smoke_days=("low_smoke", "sum"), haze_days=("haze_obs", lambda s: int((s > 0).sum())),
                                          smoke_days_fixed=("smoke_fixed", "sum"), smoke_upwind=("smoke_upwind", "sum"),
-                                         smoke_calm_only=("smoke_calm_only", "sum"),
-                                         hs_near=("hs_near", "sum"), hs_reg=("hs_reg", "sum"))
+                                         smoke_calm_only=("smoke_calm_only", "sum"), smoke_lt1_days=("smoke_lt1", "sum"),
+                                         hs_near=("hs_near", "sum"), hs_reg=("hs_reg", "sum"),
+                                         hs_near_high=("hs_near_high", "sum"), hs_reg_high=("hs_reg_high", "sum"))
     src = day[day["smoke_day"]].groupby([day[day["smoke_day"]].index.year, "src"]).size().unstack(fill_value=0)
     years = [{"year": int(y), **{c: int(r[c]) for c in yr.columns},
               **{f"src_{s}": int(src.loc[y, s]) if y in src.index and s in src.columns else 0 for s in ("near", "both", "regional", "none", "nodata")}}
@@ -368,8 +391,16 @@ def build(cfg):
     ev = {}
     for y in cfg["event_years"]:
         d = day[(day.index.year == y) & day.index.month.isin(cfg["season_months"])]
-        ev[str(y)] = [[str(i.date()), None if pd.isna(r.vis_min) else round(float(r.vis_min), 2), int(r.smoke_obs), int(r.hs_near), int(r.hs_reg)]
-                      for i, r in d.iterrows()]
+        # [date, lowest visibility km, smoke reports, hotspots <= far, hotspots far..regional, smoke on the fixed hours 0/1,
+        #  the same two hotspot counts for high confidence only, haze (HZ) reports]
+        ev[str(y)] = [[str(i.date()), None if pd.isna(r.vis_min) else round(float(r.vis_min), 2), int(r.smoke_obs), int(r.hs_near), int(r.hs_reg),
+                       int(r.smoke_fixed), int(r.hs_near_high), int(r.hs_reg_high), int(r.haze_obs)] for i, r in d.iterrows()]
+    y_now = int(m["t"].max().year)
+    sm_now = sm[(sm["t"].dt.year == y_now) & (sm["sknt"] > 0)]
+    wind_smoke_now = sm_now.groupby(bearing_sector(np.sin(np.radians(sm_now["drct"])), np.cos(np.radians(sm_now["drct"])))).size()
+    calm_now = int((m["smoke"] & (m["t"].dt.year == y_now) & (m["sknt"].fillna(0) == 0)).sum())
+    d_now = day[day.index.year == y_now]
+    vis_min_now = d_now.loc[d_now["smoke_day"], "vis_min"].min()   # lowest visibility on a day with smoke
     smoke_hour = m[m["smoke"]].groupby(m["t"].dt.hour).size().reindex(range(24), fill_value=0).tolist()
     obs_hour = m.groupby(m["t"].dt.hour).size().reindex(range(24), fill_value=0).tolist()
     smoke_month = m[m["smoke"]].groupby(m["t"].dt.month)["day"].nunique().reindex(range(1, 13), fill_value=0).tolist()
@@ -377,6 +408,14 @@ def build(cfg):
              "wind_season": wind_season.reindex(range(8), fill_value=0).astype(int).tolist(), "calm_smoke": calm,
              "smoke_month_days": smoke_month, "smoke_hour": smoke_hour, "obs_hour": obs_hour, "first": str(m["t"].min().date()), "last": str(m["t"].max().date()),
              "n": int(len(m)), "smoke_obs": int(m["smoke"].sum()), "fixed_hours_utc": fixed,
+             # every local day: {date: [lowest visibility km, smoke reports, haze reports]}, for the airport marker on the map
+             "daily": {str(i.date()): [None if pd.isna(r.vis_min) else round(float(r.vis_min), 1), int(r.smoke_obs), int(r.haze_obs)]
+                       for i, r in day.iterrows()},
+             "now": {"year": y_now, "wind_smoke": wind_smoke_now.reindex(range(8), fill_value=0).astype(int).tolist(), "calm_smoke": calm_now,
+                     "vis_min": None if pd.isna(vis_min_now) else round(float(vis_min_now), 2),
+                     "vis_min_day": None if pd.isna(vis_min_now) else str(d_now.loc[d_now["smoke_day"], "vis_min"].idxmin().date()),
+                     "first_smoke": str(d_now.index[d_now["smoke_day"]].min().date()) if d_now["smoke_day"].any() else None,
+                     "last_smoke": str(d_now.index[d_now["smoke_day"]].max().date()) if d_now["smoke_day"].any() else None},
              "reports_per_day": {int(y): round(float(c), 1) for y, c in (m.groupby(m["t"].dt.year).size() / m.groupby(m["t"].dt.year)["day"].nunique()).items()}}
 
     # --- map layers ---------------------------------------------------------------------------------------------------
@@ -395,16 +434,16 @@ def build(cfg):
         "runway": fc([(runway, {"name": cfg["airport"]["name"]})]),
         "rings": fc([(ring_geoms[r].boundary, {"km": r}) for r in rk]),
         "burned": fc(ba_map),
-        # points as rows [lon, lat, year or month, zone (FEG), local date, zone (GFW)]: GeoJSON is built in the page
-        "viirs": [[r4(g.x), r4(g.y), int(y), ZONES.index(z), str(dd.date()), ZONES.index(z2)]
-                  for g, y, z, dd, z2 in zip(vin.geometry, vin["year"], vin["zone"], vin["day"], vin["zone_gfw"])],
-        "now": [[r4(g.x), r4(g.y), int(mm), ZONES.index(z), None if pd.isna(dd) else str(dd.date()), ZONES.index(z2)]
-                for g, mm, z, dd, z2 in zip(nin.geometry, nin["month"], nin["zone"], nin["day"], nin["zone_gfw"])],
+        # points as rows [lon, lat, year or month, zone (FEG), local date, zone (GFW), high confidence 0/1]: GeoJSON is built in the page
+        "viirs": [[r4(g.x), r4(g.y), int(y), ZONES.index(z), str(dd.date()), ZONES.index(z2), int(hi)]
+                  for g, y, z, dd, z2, hi in zip(vin.geometry, vin["year"], vin["zone"], vin["day"], vin["zone_gfw"], vin["high"])],
+        "now": [[r4(g.x), r4(g.y), int(mm), ZONES.index(z), None if pd.isna(dd) else str(dd.date()), ZONES.index(z2), int(hi)]
+                for g, mm, z, dd, z2, hi in zip(nin.geometry, nin["month"], nin["zone"], nin["day"], nin["zone_gfw"], nin["high"])],
         "brgm": fc([(r.geometry, {"jenis": r.Jenis, "tahun": None if pd.isna(r.Tahun) else int(r.Tahun), "khg": r.KHG, "desa": r.DESA_2023})
                     for r in brgm.itertuples() if r.geometry is not None and r.geometry.within(ext_box)]),
     }
     return {"cfg": {k2: cfg[k2] for k2 in ("airport", "khg", "rings_km", "extent", "regional_km", "season_months", "low_vis_km",
-                                          "event_years", "smoke_codes", "hotspots", "now")},
+                                          "event_years", "smoke_codes", "hotspots", "now") if k2 in cfg} | {"gibs": cfg.get("gibs")},
             "facts": facts, "hot": hot, "burned": burned, "metar": metar, "layers": layers,
             "gfw_png": gfw_png(gfw_path, ext)}
 

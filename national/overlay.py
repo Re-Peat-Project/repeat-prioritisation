@@ -55,9 +55,9 @@ LIC_LABEL = {"sawit": "Oil palm", "pbph": "Forest concession (PBPH)", "pphkm": "
 CODE_TO_KWS = {c: k for k, cs in KWS_CLASS.items() for c in cs}
 
 DEFAULT = {"overlay": {"top_actors": 8, "company_names": True, "max_licence_polygons": 120},
-           "inputs": {"forest_area": "KWSHUTAN_AR_250K_2023_Transcripted.gpkg",
-                      "peat_function": "FEG__Indonesia__2017__Rev_Tipologi.gpkg",
-                      "licences": "ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg"}}
+           "inputs": {"forest_area": "landstatus/KWSHUTAN_AR_250K_2023_Transcripted.gpkg",
+                      "peat_function": "landstatus/FEG__Indonesia__2017__Rev_Tipologi.gpkg",
+                      "licences": "landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg"}}
 
 
 def load_cfg(path):

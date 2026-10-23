@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Banjarbaru airport fire check</title>
+<title>Banjarbaru airport fire 2026</title>
 <style>/*MLCSS*/</style>
 <style>
 :root{color-scheme:light;
@@ -47,11 +47,6 @@ section{margin:18px 0}
 .dot{border-radius:50%}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2);margin:4px 0}
 .legend span{display:inline-flex;align-items:center;gap:5px}
-.checks{list-style:none;margin:0;padding:0}
-.checks li{display:grid;grid-template-columns:22px 1fr;gap:4px;padding:7px 0;border-bottom:1px solid var(--grid);font-size:13px}
-.checks li:last-child{border-bottom:0}
-.checks .ok{color:var(--c-out);font-weight:700}.checks .no{color:var(--c-peat);font-weight:700}
-.checks small{display:block;color:var(--muted);font-size:12px}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th,td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 th:first-child,td:first-child{text-align:left}
@@ -61,6 +56,20 @@ th small{font-weight:400}
 tbody tr:hover{background:var(--wash)}
 .tablewrap{overflow:auto;max-height:420px}
 #peatcard{justify-content:space-between}
+h2.divider{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:28px 0 -4px;padding-top:12px;border-top:1px solid var(--border)}
+tr.now td{font-weight:650}
+.verdict{box-shadow:inset 4px 0 0 var(--c-peat);padding:14px 18px}
+.verdict h2{font-size:16px;margin:0 0 8px}
+.verdict ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 22px}
+.verdict li{font-size:13px;color:var(--ink2);line-height:1.45}
+.verdict li b{display:block;color:var(--ink);font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+@media (max-width:1100px){.verdict ul{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.verdict ul{grid-template-columns:1fr}}
+.lab2{font-size:12.5px;color:var(--ink2);font-weight:600}
+input[type=date]{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:6px;font:inherit;font-size:12.5px;padding:1px 4px}
+.tools{flex-wrap:wrap;justify-content:flex-end}
+#neartab th{white-space:normal;vertical-align:bottom}#neartab th,#neartab td{padding:4px 6px}
+.kpi.now{border-color:var(--c-peat);box-shadow:inset 3px 0 0 var(--c-peat)}
 input[type=search]{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font:inherit;font-size:13px;margin-bottom:6px;width:220px}
 .axis path,.axis line{stroke:var(--axis)}
 .axis text{fill:var(--muted);font-size:11px}
@@ -80,25 +89,41 @@ svg text.end{font-size:11.5px;font-weight:600}
 </style></head>
 <body>
 <header>
-  <div><h1 data-t="Syamsudin Noor airport and KHG Sungai Maluka - Sungai Martapura"></h1>
+  <div><h1 data-t="Peat fire 2026 around Syamsudin Noor airport"></h1>
   <p class="sub" id="sub"></p></div>
-  <div class="tools"><span class="sub" data-t="Peat map"></span><div class="seg" id="peatmap"><button data-p="feg" class="on" data-t="FEG 1:50,000"></button><button data-p="gfw" data-t="GFW composite, 76 m"></button></div><div class="seg" id="lang"><button data-l="en" class="on">EN</button><button data-l="id">ID</button></div>
+  <div class="tools"><span class="sub" data-t="Confidence"></span><div class="seg" id="conf"><button data-c="all" class="on" data-t="Medium + high"></button><button data-c="high" data-t="High only"></button></div><span class="sub" data-t="Peat map"></span><div class="seg" id="peatmap"><button data-p="feg" class="on" data-t="FEG 1:50,000"></button><button data-p="gfw" data-t="GFW composite, 76 m"></button></div><div class="seg" id="lang"><button data-l="en" class="on">EN</button><button data-l="id">ID</button></div>
   <button id="theme" data-t="Theme"></button></div>
 </header>
 <main>
 <section class="grid kpis" id="kpis"></section>
 
+<section class="card verdict" id="verdict"></section>
+
 <section class="grid two">
   <div class="card"><h2 data-t="Map"></h2>
     <div class="toggles" id="toggles"></div>
+    <div class="toggles" id="smokectl"></div>
     <div id="map"></div>
     <div class="legend" id="maplegend"></div>
   </div>
   <div class="grid" style="grid-template-rows:auto 1fr">
-    <div class="card"><h2 data-t="Is this KHG Sungai Maluka - Sungai Martapura?"></h2><ul class="checks" id="checks"></ul></div>
+    <div class="card"><h2 data-t="2026 hotspots per month, within 20 km"></h2><div class="legend zl"></div><div id="nowmonth"></div></div>
     <div class="card" id="peatcard"><h2 data-t="Peat under the KHG, three sources"></h2><div id="peatbars"></div></div>
   </div>
 </section>
+
+<section class="grid two">
+  <div class="card"><h2><span data-t="Fire season, daily"></span> <select id="evyear"></select></h2><div class="legend" id="el"></div><div id="event"></div></div>
+  <div class="card"><h2 data-t="Smoke days so far, by fire year"></h2><div class="legend" id="cl"></div><div id="cum"></div></div>
+</section>
+
+<section class="grid thirds">
+  <div class="card"><h2 data-t="2026 hotspots within 5 km of the runway"></h2><input type="search" id="qn" data-tp="Search"><div class="tablewrap" style="max-height:330px"><table id="neartab"></table></div></div>
+  <div class="card"><h2 data-t="Wind during smoke reports"></h2><div id="rose1"></div></div>
+  <div class="card"><h2 data-t="Where the hotspots are, within 10 km"></h2><div id="rose2"></div></div>
+</section>
+
+<h2 class="divider" data-t="Context: 2012 to 2025"></h2>
 
 <section class="grid halves">
   <div class="card"><h2 data-t="Hotspots per year within 5 km of the runway"></h2><div class="legend zl"></div><div id="hs5"></div></div>
@@ -110,14 +135,8 @@ svg text.end{font-size:11.5px;font-weight:600}
   <div class="card"><h2 data-t="Burned area per year inside the KHG"></h2><div class="legend" id="bl"></div><div id="burn"></div></div>
 </section>
 
-<section class="grid halves">
+<section class="grid two">
   <div class="card"><h2 data-t="Smoke at the airport and fire nearby, per year"></h2><div class="legend" id="sl"></div><div id="smokeyr"></div></div>
-  <div class="card"><h2><span data-t="Fire season, daily"></span> <select id="evyear"></select></h2><div class="legend" id="el"></div><div id="event"></div></div>
-</section>
-
-<section class="grid thirds">
-  <div class="card"><h2 data-t="Wind during smoke reports"></h2><div id="rose1"></div></div>
-  <div class="card"><h2 data-t="Where the hotspots are, within 10 km"></h2><div id="rose2"></div></div>
   <div class="card"><h2 data-t="Smoke reports by hour"></h2><div id="hour"></div></div>
 </section>
 
