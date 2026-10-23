@@ -319,8 +319,12 @@ function renderProfile(){
     [info&&info.hs_now!=null?fmt(info.hs_now,0):t("n/a"),info&&info.rank_now?t("Hotspots this year · #{a} by density, #{b} by count",{a:info.rank_now,b:info.rank_now_n}):t("Hotspots this year")],
     [info&&info.tma_n?`${Math.round(info.tma_deep*100)}<small>${t("% of days")}</small>`:t("none"),info&&info.tma_n?t("Water table below 0.4 m ({n} stations)",{n:info.tma_n}):t("Water table stations")],
     [`${confChar[K.conf[i]]}<small>${t(confName[K.conf[i]])}</small>`,t("Data confidence")]];
+  if(P&&P.ov){const fo=P.ov.s.forest||[],pt=d3.sum(fo,x=>x[2]),la=(P.ov.s.licence_any||[[0,0,0]])[0][2],ln=(P.ov.s.licence_any||[[0,0,0,0,0,0]])[0][5]||0;
+    tiles.push([`${pt?Math.round(100*la/pt):0}<small>%</small>`,t("Peat under a licence")+(la?t(" · {n} km2 on protected function",{n:fmt(ln,0)}):"")]);
+    tileTips.push(t("Share of the KHG's peat inside any business licence of the 2025 layer. Overlapping licences count once. Below it: licensed area that lies on protected peat function."))}
   $("#p-kpis").innerHTML=tiles.map((tl,j)=>`<div class="kpi"${tipAttr(tileTips[j])}><div class="v">${tl[0]}</div><div class="l">${tl[1]}</div></div>`).join("");
   renderStrips(i);
+  $("#p-ov-panel").innerHTML="";
   const charts=$("#p-charts");charts.innerHTML="";
   if(!P){charts.innerHTML=`<p class="hint">${t("No detailed profile for this KHG. The profiles cover the top {n} at default weights and the team KHG.",{n:META.top_n})}</p>`;drawMap(null);$("#p-table").innerHTML="";return}
   const mk=(title,tip,wide)=>{const d=document.createElement("div");d.className="ch"+(wide?" wide":"");d.innerHTML=`<h3 class="hasTip"${tipAttr(t(tip))}>${t(title)}</h3><div></div>`;charts.appendChild(d);return d.lastChild};
@@ -330,8 +334,10 @@ function renderProfile(){
   lineChart(mk("Dry-season water deficit, mm","TerraClimate climatic water deficit summed over the dry months (June to October), in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.deficit,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
   lineChart(mk("Rain June to October, mm","TerraClimate rainfall in the dry months, in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.rain,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
   landBar(mk("Land cover","ESA WorldCover classes sampled at 250 m. Open land is grass, shrub, crop, built and bare. Shown for context, not scored.",true),P.lc);
+  renderOv(P);
   drawMap(P);
   renderDataTable(P);
+  if(P.ov)$("#p-table").insertAdjacentHTML("beforeend",ovTable(P));
 }
 function renderDataTable(P){
   const yrs=[...new Set([...P.burned.map(d=>d[0]),...P.hs.map(d=>d[0]),...P.deficit.map(d=>d[0])])].sort();
@@ -410,12 +416,27 @@ function landBar(host,lc){
 let pmap=null,pReady=false,pPending=undefined;
 const pLayers={burn:true,p:true,s:true,t:true,now:true};
 const EMPTY={type:"FeatureCollection",features:[]};
+const pOv={mode:"off",vil:false};
+const OVCLS={
+  forest:[["cons","Conservation"],["hl","Protection forest"],["prod","Production forest"],["hpk","Convertible production"],["apl","Other land use"],["other","Water, undefined"],["none","Not mapped"]],
+  feg:[["lindung","Protected function"],["budidaya","Cultivation function"],["none","Not mapped"]],
+  licence:[["sawit","Oil palm"],["pbph","Forest concession (PBPH)"],["pphkm","Community forest (PPHKM)"],["pphtr","Plantation forest (PPHTR)"],["tambang","Mining"],["none","No licence"]],
+  village:[["in","Target village"],["out","Outside target villages"]]};
+function ovColor(layer,c){
+  const d=isDark(),v=d?"#9085e9":"#6250d6",g="#008300",y=d?"#c98500":"#eda100",m=d?"#d55181":"#e87ba4",r=d?"#e66767":"#e34948",n=d?"#4a4a46":"#c9c8c0",b=d?"#5b7080":"#9fb3c1";
+  const map={forest:{cons:v,hl:g,prod:y,hpk:m,apl:n,other:b,none:n},feg:{lindung:g,budidaya:y,none:n},licence:{sawit:y,pbph:g,pphkm:m,pphtr:v,tambang:r,none:n},village:{in:v,out:n}};
+  return (map[layer]||{})[c]||n}
+const ovMatch=layer=>["match",["get","c"],...OVCLS[layer].flatMap(([c])=>[c,ovColor(layer,c)]),ovColor(layer,"none")];
+const ovTip={off:"Hide the land-status layers.",forest:"Forest area function 2023 (Kawasan Hutan, 1:250,000).",feg:"Peat ecosystem function 2017 (FEG): protected or cultivation.",licence:"Business licences, 2025 update. Hover for the holder."};
 function pTheme(){
   if(!pmap||!pReady)return;
   const ramp=d3.interpolateRgb(css("--ramp0"),css("--ramp1")),on=css("--now"),sf=css("--surface");
   pmap.setPaintProperty("p-burn","fill-color",["match",["get","n"],1,ramp(.25),2,ramp(.5),3,ramp(.75),ramp(1)]);
   for(const id of ["p-canal-p","p-canal-s","p-canal-t"])pmap.setPaintProperty(id,"line-color",css("--canal"));
   pmap.setPaintProperty("p-outline","line-color",css("--ink"));
+  pmap.setPaintProperty("p-ov-forest","fill-color",ovMatch("forest"));pmap.setPaintProperty("p-ov-feg","fill-color",ovMatch("feg"));
+  pmap.setPaintProperty("p-ov-lic","fill-color",ovMatch("licence"));pmap.setPaintProperty("p-ov-lic-line","line-color",ovMatch("licence"));
+  pmap.setPaintProperty("p-ov-vil","line-color",ovColor("village","in"));
   for(const id of ["p-now-h","p-now-m"]){pmap.setPaintProperty(id,"circle-color",["case",["==",["get","p"],1],on,"rgba(0,0,0,0)"]);pmap.setPaintProperty(id,"circle-stroke-color",["case",["==",["get","p"],1],sf,on]);pmap.setPaintProperty(id,"circle-stroke-width",["case",["==",["get","p"],1],.8,1.4])}
 }
 function initProfileMap(){
@@ -423,6 +444,12 @@ function initProfileMap(){
   pmap.on("load",()=>{
     const before=firstSymbol(pmap);
     for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now"])pmap.addSource(s,{type:"geojson",data:EMPTY});
+    for(const s of ["p-ov-forest","p-ov-feg","p-ov-lic","p-ov-vil"])pmap.addSource(s,{type:"geojson",data:EMPTY});
+    const fillOv=(id,src,op)=>pmap.addLayer({id,type:"fill",source:src,layout:{visibility:"none"},paint:{"fill-color":"#888","fill-opacity":op}},before);
+    fillOv("p-ov-forest","p-ov-forest",.55);fillOv("p-ov-feg","p-ov-feg",.55);fillOv("p-ov-lic","p-ov-lic",.38);
+    pmap.addLayer({id:"p-ov-lic-line",type:"line",source:"p-ov-lic",layout:{visibility:"none"},paint:{"line-color":"#888","line-width":1.3}},before);
+    fillOv("p-ov-vil-f","p-ov-vil",.02);
+    pmap.addLayer({id:"p-ov-vil",type:"line",source:"p-ov-vil",layout:{visibility:"none"},paint:{"line-color":"#6250d6","line-width":1.6,"line-dasharray":[3,2]}},before);
     pmap.addLayer({id:"p-burn",type:"fill",source:"p-burn",paint:{"fill-color":"#2a78d6","fill-opacity":.85}},before);
     const w=(a,b)=>["interpolate",["linear"],["zoom"],7,a,14,b];
     pmap.addLayer({id:"p-canal-t",type:"line",source:"p-canal-t",layout:{"line-join":"round"},paint:{"line-color":"#1baf7a","line-width":w(.3,1),"line-opacity":.55}},before);
@@ -434,6 +461,11 @@ function initProfileMap(){
     for(const id of ["p-now-m","p-now-h"]){
       pmap.on("mousemove",id,e=>{const f=e.features[0];if(f){pmap.getCanvas().style.cursor="pointer";showTip(`<b>${t("Hotspot, {m}",{m:monf(f.properties.m)})}</b><br><span>${t("{c} confidence · {p}",{c:t(f.properties.h?"high":"medium"),p:t(f.properties.p?"on peat":"off peat")})}</span>`,e.originalEvent)}});
       pmap.on("mouseleave",id,()=>{pmap.getCanvas().style.cursor="";hideTip()})}
+    const ovHover=(id,f)=>{pmap.on("mousemove",id,e=>{if(pmap.queryRenderedFeatures(e.point,{layers:["p-now-m","p-now-h"]}).length)return;const x=e.features[0];if(x)showTip(f(x.properties),e.originalEvent)});pmap.on("mouseleave",id,hideTip)};
+    const lab=(layer,c)=>t((OVCLS[layer].find(a=>a[0]===c)||[0,""])[1]);
+    ovHover("p-ov-forest",p=>`<b>${lab("forest",p.c)}</b>`);ovHover("p-ov-feg",p=>`<b>${lab("feg",p.c)}</b>`);
+    ovHover("p-ov-lic",p=>`<b>${esc(p.n||lab("licence",p.c))}</b><br><span>${lab("licence",p.c)}</span>`);
+    ovHover("p-ov-vil-f",p=>`<b>${esc(p.n)}</b><br><span>${t("Target village")}</span>`);
     pReady=true;pTheme();applyLayerToggles();
     if(pPending!==undefined)setProfileData(pPending);
   });
@@ -442,29 +474,93 @@ function applyLayerToggles(){
   if(!pmap||!pReady)return;
   const vis=(ids,on)=>ids.forEach(id=>pmap.setLayoutProperty(id,"visibility",on?"visible":"none"));
   vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-m","p-now-h"],pLayers.now);
+  vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);
 }
 function setProfileData(P){
   const fc=f=>({type:"FeatureCollection",features:f});
-  if(!P){for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now"])pmap.getSource(s).setData(EMPTY);return}
+  if(!P){for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-vil"])pmap.getSource(s).setData(EMPTY);return}
   const L=P.lay,pairs=a=>{const c=[];for(let j=0;j<a.length;j+=2)c.push([a[j],a[j+1]]);return c};
   pmap.getSource("p-burn").setData(fc(L.burn.map(b=>({type:"Feature",properties:{n:b.n},geometry:{type:"MultiPolygon",coordinates:b.r}}))));
   pmap.getSource("p-outline").setData(fc([{type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates:L.outline}}]));
   for(const [k,id] of [["t","p-canal-t"],["s","p-canal-s"],["p","p-canal-p"]])pmap.getSource(id).setData(fc(L.canals[k].map(a=>({type:"Feature",properties:{},geometry:{type:"LineString",coordinates:pairs(a)}}))));
   pmap.getSource("p-now").setData(fc(L.now.map(p=>({type:"Feature",properties:{m:p[2],h:p[3],p:p[4]},geometry:{type:"Point",coordinates:[p[0],p[1]]}}))));
+  const O=L.ov||{},poly=(arr,f)=>fc((arr||[]).map(x=>({type:"Feature",properties:f(x),geometry:{type:"MultiPolygon",coordinates:x.r}})));
+  pmap.getSource("p-ov-forest").setData(poly(O.forest,x=>({c:x.c})));pmap.getSource("p-ov-feg").setData(poly(O.feg,x=>({c:x.c})));
+  pmap.getSource("p-ov-lic").setData(poly(O.licence,x=>({c:x.c,n:x.n})));pmap.getSource("p-ov-vil").setData(poly(O.village,x=>({n:x.n})));
   const b=L.bounds;pmap.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:28,duration:0,maxZoom:14});
 }
 function drawMap(P){
   if(!pmap)initProfileMap();
   pPending=P;if(pmap&&pReady)setProfileData(P);
   const tools=$("#p-tools");tools.innerHTML="";
-  if(!P){$("#p-foot").textContent="";return}
+  if(!P){$("#p-foot").textContent="";$("#p-ov-leg").innerHTML="";return}
   const T=[["burn","Burned, times",`<i style="background:var(--hist)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. Darker means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"KLH MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
   T.forEach(([k,tx,ic,tp])=>{const s=document.createElement("span");s.className="tg"+(pLayers[k]?"":" off");s.innerHTML=ic+t(tx,{n:P.lay.now_total||P.lay.now.length});s.dataset.tip=t(tp);s.onclick=()=>{pLayers[k]=!pLayers[k];s.classList.toggle("off",!pLayers[k]);applyLayerToggles()};tools.appendChild(s)});
+  if(P.lay.ov){
+    const lb=document.createElement("span");lb.className="lab";lb.textContent=t("Land status");tools.appendChild(lb);
+    const seg=document.createElement("span");seg.className="seg";
+    [["off","Off"],["forest","Forest area"],["feg","Peat function"],["licence","Licences"]].forEach(([k,l])=>{const b=document.createElement("button");b.type="button";b.textContent=t(l);b.dataset.tip=t(ovTip[k]);b.className=pOv.mode===k?"on":"";
+      b.onclick=()=>{pOv.mode=k;[...seg.children].forEach(x=>x.classList.toggle("on",x===b));applyLayerToggles();ovLegend(P)};seg.appendChild(b)});
+    tools.appendChild(seg);
+    const v=document.createElement("span");v.className="tg"+(pOv.vil?"":" off");v.innerHTML=`<i style="border-top:2px dashed ${ovColor("village","in")};height:0;background:none"></i>`+t("Target villages");v.dataset.tip=t("Target villages of the 2026 Bluebook for peat ecosystem restoration. Hover for the village.");
+    v.onclick=()=>{pOv.vil=!pOv.vil;v.classList.toggle("off",!pOv.vil);applyLayerToggles()};tools.appendChild(v);
+  }
+  ovLegend(P);
   $("#p-foot").innerHTML=t("Filled dot: on peat. Hollow: off peat. Large: high confidence.")+(P.lay.now_total>P.lay.now.length?" "+t("Showing {a} of {b} points.",{a:P.lay.now.length,b:P.lay.now_total}):"")+" "+t("Basemap needs internet.");
 }
+function ovLegend(P){
+  const host=$("#p-ov-leg");host.innerHTML="";if(!P||!P.lay.ov)return;
+  const items=[];
+  if(pOv.mode!=="off"){const layer=pOv.mode,present=new Set((P.lay.ov[layer]||[]).map(x=>x.c));OVCLS[layer].filter(([c])=>present.has(c)).forEach(([c,l])=>items.push(`<span><span class="sw" style="background:${ovColor(layer,c)}"></span>${t(l)}</span>`))}
+  host.innerHTML=items.join("");
+}
+function ovSeg(layer,rows,tot){
+  const mk=(k)=>{const v=rows.map(r=>r.v[k]),den=Math.max(tot[k],d3.sum(v))||1;
+    return v.map((x,j)=>x>0?`<i style="width:${100*x/den}%;background:${ovColor(layer,rows[j].c)}"${tipAttr(`<b>${t(rows[j].l)}</b><br>${fmt(x,k===2?0:1)}${k===2?"":" km2"} <span>(${fmt(100*x/(tot[k]||1),0)}% ${t(["of the peat","of the burned peat","of the hotspots"][k])})</span>`)}></i>`:"").join("")};
+  return [0,1,2].map(k=>mk(k))}
+function renderOv(P){
+  const host=$("#p-ov-panel");host.innerHTML="";if(!P||!P.ov)return;
+  const S=P.ov.s,fo=S.forest||[],tot=[d3.sum(fo,r=>r[2]),d3.sum(fo,r=>r[3]),d3.sum(fo,r=>r[4])];
+  const val=(layer,c)=>{const r=(S[layer]||[]).find(x=>x[0]===c);return r?[r[2],r[3],r[4]]:[0,0,0]};
+  const mkRows=(layer,codes)=>codes.map(c=>({c,l:(OVCLS[layer].find(a=>a[0]===c)||[0,c])[1],v:val(layer,c)}));
+  const groups=[];
+  groups.push({layer:"forest",title:"Forest area function",tip:"Forest area function 2023 (Kawasan Hutan, 1:250,000). Bars: the share of the KHG's peat, of the peat burned in 2015 to 2025, and of this year's hotspots on peat.",rows:mkRows("forest",OVCLS.forest.map(a=>a[0]))});
+  groups.push({layer:"feg",title:"Peat function",tip:"Peat ecosystem function 2017, revised typology: indicative protected (Lindung) or cultivation (Budidaya). Same three measures.",rows:mkRows("feg",OVCLS.feg.map(a=>a[0]))});
+  const lic=OVCLS.licence.slice(0,5).map(([c,l])=>({c,l,v:(S["licence_"+c]||[[0,0,0,0,0]])[0].slice(2,5)}));
+  const any=(S.licence_any||[[0,0,0,0,0]])[0].slice(2,5);
+  lic.push({c:"none",l:"No licence",v:tot.map((x,k)=>Math.max(0,x-any[k]))});
+  groups.push({layer:"licence",title:"Licences",tip:"Business licences, 2025 update. Licences overlap, so the segments can add up to more than the peat; the grey segment is peat with no licence.",rows:lic});
+  groups.push({layer:"village",title:"Target villages",tip:"Village areas targeted for peat restoration in the 2026 Bluebook.",rows:[{c:"in",l:"Target village",v:val("village","in")},{c:"out",l:"Outside target villages",v:tot.map((x,k)=>Math.max(0,x-val("village","in")[k]))}]});
+  const rowLab=[["Peat area","Peat area in each class, from the GFW peat extent."],["Burned peat","Peat that burned at least once in 2015 to 2025 (burnt-area polygons)."],["Hotspots this year","KLH MODIS hotspots on peat this year, medium and high confidence."]];
+  const totTxt=[fmt(tot[0],0)+" km2",fmt(tot[1],0)+" km2",fmt(tot[2],0)];
+  let html=`<div class="ovhead"><h3 class="hasTip"${tipAttr(t("Where the peat, the burned peat and this year's hotspots fall on each land-status layer. A segment wider in the lower bars than in the top bar means fire is over-represented in that class."))}>${t("Land status of the peat")}</h3></div><div class="ovgrid">`;
+  groups.forEach(g=>{
+    const rows=g.rows.filter(r=>(r.v[0]>=.002*tot[0]||r.v[1]>0||r.v[2]>0)&&r.v[0]+r.v[1]+r.v[2]>0);if(!rows.length)return;
+    const bars=ovSeg(g.layer,rows,tot);
+    html+=`<div class="ovg"><div class="ovt hasTip"${tipAttr(t(g.tip))}>${t(g.title)}</div><div class="ovleg">${rows.map(r=>`<span><span class="sw" style="background:${ovColor(g.layer,r.c)}"></span>${t(r.l)}${tot[0]?` <small>${fmt(100*r.v[0]/tot[0],0)}%</small>`:""}</span>`).join("")}</div>`+
+      [0,1,2].map(k=>`<div class="ovrow"><span class="ovl hasTip"${tipAttr(t(rowLab[k][1]))}>${t(rowLab[k][0])}</span><div class="ovbar">${bars[k]}</div><span class="ovv">${totTxt[k]}</span></div>`).join("")+`</div>`});
+  html+="</div>";
+  const A=P.ov.a;
+  html+=`<div class="ovact"><div class="ovt hasTip"${tipAttr(t("Licence holders in this KHG, sorted by hotspots this year inside their licence area. Overlapping licences of one holder count once."))}>${t("Licence holders")}</div>`;
+  if(!A.length)html+=`<p class="hint">${t("No licence of the 2025 layer overlaps this KHG.")}</p>`;
+  else{const mx=d3.max(A,a=>a[4])||1;
+    html+=`<div class="tablewrap" style="max-height:none"><table><thead><tr><th${tipAttr(t("Holder named in the licence layer."))}>${t("Holder")}</th><th${tipAttr(t("Licence type."))}>${t("Type")}</th><th${tipAttr(t("Licence area inside the KHG, km2."))}>${t("Area km2")}</th><th${tipAttr(t("Part of that area on protected peat function (FEG Lindung), km2."))}>${t("On protected km2")}</th><th${tipAttr(t("Peat inside the licence that burned at least once in 2015 to 2025, km2."))}>${t("Burned peat km2")}</th><th${tipAttr(t("KLH hotspots on peat this year inside the licence area."))}>${t("Hotspots")}</th></tr></thead><tbody>`+
+      A.map(a=>`<tr><td style="text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis" title="${esc(a[0])}">${esc(a[0])}</td><td style="text-align:left">${esc(t(a[1]))}</td><td>${fmt(a[2],1)}</td><td>${fmt(a[5],1)}</td><td>${fmt(a[3],1)}</td><td style="background:linear-gradient(90deg,var(--wash) ${100*a[4]/mx}%,transparent ${100*a[4]/mx}%)">${fmt(a[4],0)}</td></tr>`).join("")+`</tbody></table></div><p class="hint">${t("Hotspots inside each licence area, year to date. This shows where fires burn, not who started them.")}</p>`}
+  html+="</div>";
+  host.innerHTML=html;
+}
+function ovTable(P){
+  const names={forest:"Forest area function",feg:"Peat function",village:"Target villages"};
+  let rows="";
+  for(const [layer,arr] of Object.entries(P.ov.s)){
+    const base=layer.startsWith("licence_")?"licence":layer,lb=layer==="licence_any"?t("Any licence"):null;
+    arr.forEach(r=>{const l=lb||t((OVCLS[base].find(a=>a[0]===r[0])||[0,r[0]])[1]);
+      rows+=`<tr><td style="text-align:left">${t(names[layer]||"Licences")}</td><td style="text-align:left">${esc(l)}</td><td>${fmt(r[1],1)}</td><td>${fmt(r[2],1)}</td><td>${fmt(r[3],1)}</td><td>${fmt(r[4],0)}</td></tr>`})}
+  return `<table style="margin-top:10px"><thead><tr><th style="text-align:left">${t("Layer")}</th><th style="text-align:left">${t("Class")}</th><th>${t("Area km2")}</th><th>${t("Peat km2")}</th><th>${t("Burned peat km2")}</th><th>${t("Hotspots")}</th></tr></thead><tbody>${rows}</tbody></table>`}
 function themeMaps(){
   for(const m of [nat,pmap])if(m&&m.isStyleLoaded()){restyleBase(m)}
   pTheme();
+  if(state.sel){const P=profData(state.sel);if(P&&P.ov){renderOv(P);ovLegend(P)}}
 }
 
 function staticTips(){

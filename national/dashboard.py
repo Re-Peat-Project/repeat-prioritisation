@@ -195,6 +195,29 @@ def build(cfg, top_n, out_path):
             },
         }
 
+    ov_dir = base / "stage3" / "overlay"
+    has_ov = (ov_dir / "overlay_summary.csv").exists() and (ov_dir / "overlay_map.json").exists()
+    if has_ov:
+        ovs = pd.read_csv(ov_dir / "overlay_summary.csv", dtype={"khg_id": str})
+        ova = pd.read_csv(ov_dir / "overlay_actors_top.csv", dtype={"khg_id": str}) if (ov_dir / "overlay_actors_top.csv").exists() else pd.DataFrame(columns=["khg_id"])
+        ovm = json.loads((ov_dir / "overlay_map.json").read_text(encoding="utf-8"))
+        rd = lambda v, nd=2: None if pd.isna(v) else round(float(v), nd)
+        for k, pr in profiles.items():
+            if k not in ovm:
+                continue
+            m = dict(ovm[k])
+            cell = m.pop("cell_m", None)
+            pr["lay"]["ov"] = m
+            sub = ovs[ovs.khg_id == k]
+            summ = {}
+            for layer, g_ in sub.groupby("layer"):
+                summ[layer] = [[r["class"], rd(r.area_km2), rd(r.peat_km2), rd(r.burned_peat_km2), int(r.hs_now_peat)]
+                               + ([rd(r.lindung_km2), rd(r.forest_protected_km2)] if layer.startswith("licence_") else [])
+                               for _, r in g_.iterrows()]
+            act = [[r.company, r.type, rd(r.area_km2), rd(r.burned_peat_km2), int(r.hs_now_peat), rd(r.lindung_km2)]
+                   for r in ova[ova.khg_id == k].itertuples()]
+            pr["ov"] = {"cell": cell, "s": summ, "a": act}
+
     validation = None
     if vrep:
         v = vrep["validation"]
@@ -206,7 +229,7 @@ def build(cfg, top_n, out_path):
         "generated": date.today().isoformat(), "period_now": nowrep.get("last_date"), "baseline": f"{nb[0]} to {nb[1]}",
         "n_khg": len(prof), "min_area": cfg["min_area_km2"], "min_peat": cfg["peat"]["min_peat_km2"],
         "weights": {pid: float(rep["weights"].get(col, 0.0)) for pid, col, *_ in PARAMS}, "validation": validation, "peat_by_island": gpm_by_island,
-        "top_n": top_n,
+        "top_n": top_n, "overlay": has_ov,
     }
     params = [{"id": pid, "group": grp, "label": lab, "unit": unit} for pid, _, grp, lab, unit, _ in PARAMS]
     return {"meta": meta, "params": params, "khg": cols, "geo": geo}, profiles

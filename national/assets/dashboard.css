@@ -140,3 +140,22 @@ tbody tr:hover,tbody tr.sel{background:var(--wash)}
 .grid.tablemode #rank{grid-column:2/4}
 .grid.tablemode .side{display:none}
 .grid.tablemode .tablewrap{max-height:70vh}
+.ovp{margin-bottom:12px}
+.ovp:empty{display:none}
+.ovhead h3{font-size:13px;font-weight:600;margin:0 0 6px}
+.ovgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 18px}
+.ovt{font-size:12.5px;font-weight:600;margin:0 0 3px}
+.ovleg{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:11.5px;color:var(--ink2);margin-bottom:4px}
+.ovleg .sw{margin-right:4px;vertical-align:-1px}
+.ovleg small{color:var(--muted)}
+.ovrow{display:grid;grid-template-columns:104px 1fr 64px;gap:8px;align-items:center;height:20px}
+.ovl{font-size:11.5px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ovv{font-size:11.5px;color:var(--ink2);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ovbar{display:flex;gap:2px;height:12px;background:var(--grid);border-radius:3px;overflow:hidden}
+.ovbar i{display:block;min-width:1px}
+.ovact{margin-top:12px}
+.ovact table{font-size:12px}
+.ovact td,.ovact th{padding:2px 8px}
+#p-ov-leg{margin:6px 0 0;min-height:0}
+#p-ov-leg:empty{display:none}
+.ovact th:nth-child(-n+2),.ovact td:nth-child(-n+2){text-align:left}
