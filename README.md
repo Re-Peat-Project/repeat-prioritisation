@@ -53,6 +53,10 @@ It is the Python alternative to a GEE workflow: layers are read from cloud-nativ
 
 `python -m national.profile` and `python -m national.dashboard` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an interactive dashboard (D3, vendored in `national/assets`). They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m tests.test_national_profile`.
 
+## Investigations
+
+`python -m investigations.airport --config configs/investigations/banjarbaru.yaml` writes a one-page report on fire near an airport and the KHG around it (runway against the KHG, peat from three sources, hotspots and burned area split into peat soil, mineral soil and outside the KHG, and the airport's METAR visibility, smoke and wind). Output: `${REPEAT_WORK}/investigations/banjarbaru.html`; `--reassemble` reuses the data. Inputs come from `repeat_common.fetch_klhk_peat`, `fetch_peat_extent --extra` and `fetch_metar`.
+
 ## Sub-KHG program
 
 Delineation, the need ranking and its indicators are described in [subkhg/README.md](subkhg/README.md). The sections below describe the shared engine and the national ranking. Where the sub-KHG program differs, they say so.

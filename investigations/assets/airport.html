@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Banjarbaru airport fire check</title>
+<style>/*MLCSS*/</style>
+<style>
+:root{color-scheme:light;
+  --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#6f6e69;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);
+  --c-peat:#eb6834;--c-min:#2a78d6;--c-out:#1baf7a;--c-reg:#898781;--vis:#0b0b0b;--wash:rgba(42,120,214,.08);
+  --ramp0:#fde3d6;--ramp1:#9a3412;--burn:#d03b3b;--khg:#0b0b0b;--icon-filter:none;--shadow:0 4px 18px rgba(0,0,0,.14)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#9a9993;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
+  --c-peat:#d95926;--c-min:#3987e5;--c-out:#199e70;--c-reg:#9a9993;--vis:#f0efec;--wash:rgba(57,135,229,.14);
+  --ramp0:#5c2410;--ramp1:#f8b896;--burn:#e5534b;--khg:#f0efec;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}}
+:root[data-theme=dark]{color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#9a9993;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
+  --c-peat:#d95926;--c-min:#3987e5;--c-out:#199e70;--c-reg:#9a9993;--vis:#f0efec;--wash:rgba(57,135,229,.14);
+  --ramp0:#5c2410;--ramp1:#f8b896;--burn:#e5534b;--khg:#f0efec;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header,main{max-width:1480px;margin:0 auto;padding:0 20px}
+header{padding-top:18px;padding-bottom:10px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 24px;border-bottom:1px solid var(--border)}
+h1{font-size:21px;margin:0;font-weight:650}
+h2{font-size:15px;margin:0 0 8px;font-weight:600}
+.sub{margin:3px 0 0;color:var(--ink2);font-size:13px}
+.tools{margin-left:auto;display:flex;gap:8px;align-items:center}
+button,select{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
+button:hover,select:hover{border-color:var(--c-min)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0}.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--ink);color:var(--surface)}
+section{margin:18px 0}
+.grid{display:grid;gap:14px}
+.kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;min-width:0}
+.kpi .v{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:4px}
+.kpi .l{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:auto;padding-top:6px}
+.two{grid-template-columns:minmax(0,2.2fr) minmax(0,1fr)}
+.halves{grid-template-columns:repeat(2,minmax(0,1fr))}
+.thirds{grid-template-columns:repeat(3,minmax(0,1fr))}
+#map{flex:1 1 0;min-height:440px;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.toggles{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;align-items:center}
+.tg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:12.5px;cursor:pointer;user-select:none;color:var(--ink2)}
+.tg input{margin:0}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px}
+.dot{border-radius:50%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2);margin:4px 0}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.checks{list-style:none;margin:0;padding:0}
+.checks li{display:grid;grid-template-columns:22px 1fr;gap:4px;padding:7px 0;border-bottom:1px solid var(--grid);font-size:13px}
+.checks li:last-child{border-bottom:0}
+.checks .ok{color:var(--c-out);font-weight:700}.checks .no{color:var(--c-peat);font-weight:700}
+.checks small{display:block;color:var(--muted);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+#src th,#src td{text-align:left}
+th{color:var(--muted);font-weight:600;cursor:pointer;position:sticky;top:0;background:var(--surface)}
+th small{font-weight:400}
+tbody tr:hover{background:var(--wash)}
+.tablewrap{overflow:auto;max-height:420px}
+#peatcard{justify-content:space-between}
+input[type=search]{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font:inherit;font-size:13px;margin-bottom:6px;width:220px}
+.axis path,.axis line{stroke:var(--axis)}
+.axis text{fill:var(--muted);font-size:11px}
+.gridl line{stroke:var(--grid)}.gridl path{display:none}
+svg text.lab{fill:var(--ink2);font-size:11.5px}
+svg text.end{font-size:11.5px;font-weight:600}
+.hasTip{text-decoration:underline dotted var(--muted);text-underline-offset:3px;cursor:help}
+#tip{position:fixed;z-index:20;pointer-events:none;display:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:8px;padding:6px 10px;font-size:12.5px;max-width:320px}
+#tip span{color:var(--ink2)}
+.foot{font-size:12px;color:var(--muted);margin:22px auto 30px;max-width:1480px;padding:0 20px}
+.maplibregl-ctrl-group{background:var(--surface)!important;box-shadow:none!important;border:1px solid var(--border)}
+.maplibregl-ctrl-icon{filter:var(--icon-filter)}
+.maplibregl-ctrl-attrib{background:color-mix(in srgb,var(--surface) 80%,transparent)!important;color:var(--ink2)!important;font-size:11px}
+.maplibregl-ctrl-attrib a{color:var(--ink2)!important}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.two,.halves,.thirds{grid-template-columns:1fr}}
+@media (max-width:600px){header,main{padding:0 16px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#map{min-height:420px}}
+</style></head>
+<body>
+<header>
+  <div><h1 data-t="Syamsudin Noor airport and KHG Sungai Maluka - Sungai Martapura"></h1>
+  <p class="sub" id="sub"></p></div>
+  <div class="tools"><span class="sub" data-t="Peat map"></span><div class="seg" id="peatmap"><button data-p="feg" class="on" data-t="FEG 1:50,000"></button><button data-p="gfw" data-t="GFW composite, 76 m"></button></div><div class="seg" id="lang"><button data-l="en" class="on">EN</button><button data-l="id">ID</button></div>
+  <button id="theme" data-t="Theme"></button></div>
+</header>
+<main>
+<section class="grid kpis" id="kpis"></section>
+
+<section class="grid two">
+  <div class="card"><h2 data-t="Map"></h2>
+    <div class="toggles" id="toggles"></div>
+    <div id="map"></div>
+    <div class="legend" id="maplegend"></div>
+  </div>
+  <div class="grid" style="grid-template-rows:auto 1fr">
+    <div class="card"><h2 data-t="Is this KHG Sungai Maluka - Sungai Martapura?"></h2><ul class="checks" id="checks"></ul></div>
+    <div class="card" id="peatcard"><h2 data-t="Peat under the KHG, three sources"></h2><div id="peatbars"></div></div>
+  </div>
+</section>
+
+<section class="grid halves">
+  <div class="card"><h2 data-t="Hotspots per year within 5 km of the runway"></h2><div class="legend zl"></div><div id="hs5"></div></div>
+  <div class="card"><h2 data-t="Hotspots per year 5 to 10 km from the runway"></h2><div class="legend zl"></div><div id="hs10"></div></div>
+</section>
+
+<section class="grid halves">
+  <div class="card"><h2 data-t="Hotspot density by ground, within 10 km"></h2><div class="legend zl"></div><div id="dens"></div></div>
+  <div class="card"><h2 data-t="Burned area per year inside the KHG"></h2><div class="legend" id="bl"></div><div id="burn"></div></div>
+</section>
+
+<section class="grid halves">
+  <div class="card"><h2 data-t="Smoke at the airport and fire nearby, per year"></h2><div class="legend" id="sl"></div><div id="smokeyr"></div></div>
+  <div class="card"><h2><span data-t="Fire season, daily"></span> <select id="evyear"></select></h2><div class="legend" id="el"></div><div id="event"></div></div>
+</section>
+
+<section class="grid thirds">
+  <div class="card"><h2 data-t="Wind during smoke reports"></h2><div id="rose1"></div></div>
+  <div class="card"><h2 data-t="Where the hotspots are, within 10 km"></h2><div id="rose2"></div></div>
+  <div class="card"><h2 data-t="Smoke reports by hour"></h2><div id="hour"></div></div>
+</section>
+
+<section class="card"><h2 data-t="Smoke days and fire, per year"></h2>
+  <input type="search" id="q" data-tp="Search"><div class="tablewrap"><table id="tab"></table></div><p class="sub" id="tabnote"></p></section>
+
+<section class="card"><h2 data-t="Sources"></h2><div class="tablewrap"><table id="src"></table></div></section>
+</main>
+<p class="foot" id="foot"></p>
+<div id="tip" role="tooltip"></div>
+<script>/*D3*/</script>
+<script>/*ML*/</script>
+<script>/*DATA*/</script>
+<script>/*JS*/</script>
+</body></html>

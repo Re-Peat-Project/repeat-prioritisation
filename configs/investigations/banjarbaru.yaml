@@ -1,0 +1,29 @@
+# Fire around Syamsudin Noor airport (Banjarbaru) and KHG Sungai Maluka - Sungai Martapura.
+#   python -m investigations.airport --config configs/investigations/banjarbaru.yaml
+# Inputs: python -m repeat_common.fetch_klhk_peat --bbox 114.2 -4.2 116.6 -1.3, fetch_peat_extent --extra (the KHG layer),
+# fetch_metar --station WAOO. Environment: REPEAT_DATA, REPEAT_WORK.
+data: ${REPEAT_DATA}
+out: ${REPEAT_WORK}/investigations/banjarbaru.html
+airport:
+  icao: WAOO
+  name: Syamsudin Noor
+  runway: [[114.7510, -3.4403], [114.7740, -3.4444]]   # thresholds 10 and 28 (SkyVector, Sprinkle; not the AIP)
+  runway_source: "SkyVector WAOO; sprinkle.com/airport/WAOO (third-party, not the AIP)"
+khg:
+  code: KHG.63.01-03-71-72.01
+  name: KHG Sungai Maluka - Sungai Martapura
+  area_ha_sk: 90740.40
+  sk: SK.270/MENLHK/SETJEN/KUM.1/3/2022
+  coverage: [Kota Banjarmasin, Kota Banjarbaru, Banjar, Tanah Laut]   # as quoted from the SK.270/2022 summary
+  layer: klhk_khg_feg_50k.gpkg
+  old_basis: batas_khg_indonesia.gpkg   # SK.129/2017 boundaries, where this KHG is absent
+rings_km: [5, 10, 20]
+extent: [114.45, -3.68, 115.02, -3.20]   # map and burned-area clip
+regional_km: 150                          # hotspots within this distance count as regional for the smoke check
+hotspots: {confidence: [n, h], types: [0]}   # FIRMS VIIRS, as in the national profile
+now: {levels: [medium, high]}                # KLH 2026 hotspots, as in the national profile
+metar: metar_WAOO_2012_2026.csv
+season_months: [7, 8, 9, 10, 11]
+smoke_codes: [FU]            # METAR present weather: FU = smoke (HZ haze is shown separately, it is not specific to fire)
+low_vis_km: 5
+event_years: [2015, 2019, 2023, 2026]
