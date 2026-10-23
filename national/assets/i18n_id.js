@@ -192,5 +192,12 @@ const ID={
 "Team KHG outline":"Garis tepi KHG tim",
 "Dark outline around the KHG selected by the team.":"Garis tepi gelap di sekeliling KHG pilihan tim.",
 "Place names":"Nama tempat",
-"Basemap place names.":"Nama tempat pada peta dasar."
+"Basemap place names.":"Nama tempat pada peta dasar.",
+"Hotspot confidence":"Kepercayaan titik panas",
+"Medium + high":"Sedang + tinggi",
+"High only":"Hanya tinggi",
+"Confidence levels of this year's KLH hotspots that count. High only keeps the detections KLH rates Tinggi; the ranking and the profile numbers follow.":"Tingkat kepercayaan titik panas KLH tahun ini yang dihitung. Hanya tinggi menyimpan deteksi berkategori Tinggi; peringkat dan angka profil mengikuti.",
+"High-confidence hotspots this year · #{a} by density, #{b} by count":"Titik panas kepercayaan tinggi tahun ini · #{a} menurut kepadatan, #{b} menurut jumlah",
+"KLH MODIS hotspots on peat this year, medium and high confidence (high only when the filter is set). Ranks are by density (per km2 of peat) and by count.":"Titik panas MODIS KLH di gambut tahun ini, kepercayaan sedang dan tinggi (hanya tinggi jika filter diatur). Peringkat menurut kepadatan (per km2 gambut) dan jumlah.",
+"KLH MODIS hotspots on peat in each month of this year, medium and high confidence (high only when the filter is set).":"Titik panas MODIS KLH di gambut pada tiap bulan tahun ini, kepercayaan sedang dan tinggi (hanya tinggi jika filter diatur)."
 };

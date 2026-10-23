@@ -18,7 +18,9 @@ const DEF=PR.map(p=>META.weights[p.id]);
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const clamp01=x=>x<0?0:x>1?1:x;
-const state={w:DEF.slice(),minPeat:META.min_peat,islands:new Set(),missing:"skip",view:"top",sel:null,table:false};
+const state={w:DEF.slice(),minPeat:META.min_peat,islands:new Set(),missing:"skip",view:"top",sel:null,table:false,conf:"mh"};
+const onlyHigh=()=>state.conf==="h"&&!!K.n1h;                                    // this year's hotspots: high confidence only
+const val=(k,i)=>onlyHigh()&&PR[k].id==="n1"?K.n1h[i]:K.v[k][i];
 const TOPN=30;
 const PKEY={
   f1:["Burnt-area polygons, flagged by year, 2015 to 2025.","Area burned per year on peat, divided by the KHG's peat area, averaged over the years. A patch counts as peat if its centre point is on a peat cell."],
@@ -51,12 +53,12 @@ function compute(w){
   const Z=new Array(M).fill(null),ZR=new Array(M).fill(null),used=[];
   for(let k=0;k<M;k++){
     if(!(w[k]>0))continue;
-    const vals=[];for(let i=0;i<N;i++){if(elig[i]){const v=K.v[k][i];if(v!=null&&isFinite(v))vals.push(v)}}
+    const vals=[];for(let i=0;i<N;i++){if(elig[i]){const v=val(k,i);if(v!=null&&isFinite(v))vals.push(v)}}
     if(vals.length<minUnits)continue;
     vals.sort(d3.ascending);const lo=d3.quantileSorted(vals,.05),hi=d3.quantileSorted(vals,.95);
     if(!(hi-lo>1e-12))continue;
     const z=new Float64Array(N).fill(NaN),zr=new Float64Array(N).fill(NaN),have=[];
-    for(let i=0;i<N;i++){if(elig[i]){const v=K.v[k][i];if(v!=null&&isFinite(v)){z[i]=clamp01((v-lo)/(hi-lo));zr[i]=(v-lo)/(hi-lo);have.push(z[i])}}}
+    for(let i=0;i<N;i++){if(elig[i]){const v=val(k,i);if(v!=null&&isFinite(v)){z[i]=clamp01((v-lo)/(hi-lo));zr[i]=(v-lo)/(hi-lo);have.push(z[i])}}}
     ZR[k]=zr;
     if(state.missing==="median"){const med=d3.median(have);for(let i=0;i<N;i++)if(elig[i]&&!isFinite(z[i]))z[i]=med}
     Z[k]=z;used.push(k);
@@ -96,6 +98,8 @@ function buildControls(){
   const isl=$("#islands");isl.innerHTML="";
   [...new Set(K.island)].filter(Boolean).sort().forEach(n=>{const b=document.createElement("button");b.type="button";b.textContent=n;b.dataset.n=n;b.onclick=()=>{state.islands.has(n)?state.islands.delete(n):state.islands.add(n);syncFilters();schedule()};isl.appendChild(b)});
   const ms=$("#missing");ms.innerHTML="";[["skip","Ignore"],["median","Average"]].forEach(([v,tx])=>{const b=document.createElement("button");b.type="button";b.textContent=t(tx);b.dataset.v=v;b.onclick=()=>{state.missing=v;syncFilters();schedule()};ms.appendChild(b)});
+  const cf=$("#conf");cf.innerHTML="";if(K.n1h)[["mh","Medium + high"],["h","High only"]].forEach(([v,tx])=>{const b=document.createElement("button");b.type="button";b.textContent=t(tx);b.dataset.v=v;b.onclick=()=>{state.conf=v;syncFilters();schedule();renderProfile()};cf.appendChild(b)});
+  $("#conf").closest(".ctl").style.display=K.n1h?"":"none";
   const vs=$("#view");vs.innerHTML="";[["top",t("Top {n}",{n:TOPN})],["team",t("Team KHG")]].forEach(([v,tx])=>{const b=document.createElement("button");b.type="button";b.textContent=tx;b.dataset.v=v;b.onclick=()=>{state.view=v;syncFilters();schedule()};vs.appendChild(b)});
   const rm=$("#rank-mode");rm.innerHTML="";[["list","Bars"],["table","Table"]].forEach(([v,tx])=>{const b=document.createElement("button");b.type="button";b.textContent=t(tx);b.dataset.v=v;b.onclick=()=>{state.table=v==="table";syncFilters();render()};rm.appendChild(b)});
   const lg=$("#lang");lg.innerHTML="";[["en","EN"],["id","ID"]].forEach(([v,tx])=>{const b=document.createElement("button");b.type="button";b.textContent=tx;b.dataset.v=v;b.onclick=()=>setLang(v);lg.appendChild(b)});
@@ -107,6 +111,7 @@ function syncFilters(){
   $$("#islands button").forEach(b=>b.classList.toggle("on",state.islands.has(b.dataset.n)));
   $$("#missing button").forEach(b=>b.classList.toggle("on",b.dataset.v===state.missing));
   $$("#view button").forEach(b=>b.classList.toggle("on",b.dataset.v===state.view));
+  $$("#conf button").forEach(b=>b.classList.toggle("on",b.dataset.v===state.conf));
   $$("#rank-mode button").forEach(b=>b.classList.toggle("on",(b.dataset.v==="table")===state.table));
   $$("#lang button").forEach(b=>b.classList.toggle("on",b.dataset.v===LANG));
 }
@@ -170,7 +175,7 @@ function tableCols(){
     {t:t("Island"),tip:t("Island group."),get:i=>K.island[i]},
     {t:t("Peat km2"),tip:t("Peat area inside the KHG, from the GFW peat extent."),get:i=>K.peat[i],num:1,nd:0,unit:"km2"},
     {t:t("Score"),tip:t("Weighted mean of the parameters, scaled 0 to 1."),get:i=>isFinite(R.score[i])?R.score[i]:null,num:1,nd:3},
-    ...PR.map((p,k)=>({t:t(p.label),tip:paramTip(p),get:i=>K.v[k][i],num:1,nd:3,unit:t(p.unit),param:1}))];
+    ...PR.map((p,k)=>({t:t(p.label),tip:paramTip(p),get:i=>val(k,i),num:1,nd:3,unit:t(p.unit),param:1}))];
 }
 function fmtCell(c,v){return v==null||v===""?t("n/a"):c.num?fmt(v,c.nd):esc(v)}
 function buildTable(){
@@ -314,6 +319,13 @@ function fillPick(){
   const i0=K.id.indexOf(state.sel);sel.value=i0>=0&&K.has[i0]?state.sel:"";
 }
 function select(id){state.sel=id;const i=K.id.indexOf(id);$("#p-pick").value=K.has[i]?id:"";render(true);renderProfile();history.replaceState(null,"",hashState())}
+function hsTile(i,info){
+  if(!info||info.hs_now==null)return [t("n/a"),t("Hotspots this year")];
+  if(!onlyHigh())return [fmt(info.hs_now,0),info.rank_now?t("Hotspots this year · #{a} by density, #{b} by count",{a:info.rank_now,b:info.rank_now_n}):t("Hotspots this year")];
+  const pool=[];for(let j=0;j<N;j++)if(K.ref_rank[j]!=null)pool.push(j);
+  const rk=(arr)=>1+pool.filter(j=>arr[j]>arr[i]).length;
+  return [fmt(K.n1hn[i],0),t("High-confidence hotspots this year · #{a} by density, #{b} by count",{a:rk(K.n1h),b:rk(K.n1hn)})];
+}
 function chip(tx){return `<span class="chip">${esc(tx)}</span>`}
 function renderProfile(){
   const id=state.sel;if(!id)return;const i=K.id.indexOf(id),P=profData(id);
@@ -324,14 +336,14 @@ function renderProfile(){
   const tileTips=[t("Rank among the KHG that pass the filters, at your weights. The arrow is the change against the default weights."),
     t("Weighted mean of the parameters, scaled 0 to 1."),
     t("Peat area inside the KHG, from the GFW peat extent. Below it: the peat share of the KHG, and the share in the 1 km Global Peatland Map."),
-    t("KLH MODIS hotspots on peat this year, medium and high confidence. Ranks are by density (per km2 of peat) and by count."),
+    t("KLH MODIS hotspots on peat this year, medium and high confidence (high only when the filter is set). Ranks are by density (per km2 of peat) and by count."),
     t("SiTMAT loggers inside the KHG, 2026 season: share of days with the water table deeper than 0.4 m."),
     t("High: canals are mapped, there is enough fire signal and enough peat. Medium: two of the three. Low: fewer.")];
   const tiles=[
     [r?`${r}<small>${d?(d>0?"▲"+d:"▼"+(-d)):""}</small>`:t("n/a"),t("Rank of {n}",{n:R.order.length})+(r0?t(" · default {r}",{r:r0}):"")],
     [isFinite(R.score[i])?fx(R.score[i],2):t("n/a"),t("Score")],
     [`${fmt(K.peat[i],0)}<small>km2</small>`,info&&info.peat_gfw!=null?t("Peat: {a}% of KHG (1 km map {b})",{a:Math.round(info.peat_gfw*100),b:info.peat_gpm!=null?Math.round(info.peat_gpm*100)+"%":t("n/a")}):t("Peat area")],
-    [info&&info.hs_now!=null?fmt(info.hs_now,0):t("n/a"),info&&info.rank_now?t("Hotspots this year · #{a} by density, #{b} by count",{a:info.rank_now,b:info.rank_now_n}):t("Hotspots this year")],
+    hsTile(i,info),
     [info&&info.tma_n?`${Math.round(info.tma_deep*100)}<small>${t("% of days")}</small>`:t("none"),info&&info.tma_n?t("Water table below 0.4 m ({n} stations)",{n:info.tma_n}):t("Water table stations")],
     [`${confChar[K.conf[i]]}<small>${t(confName[K.conf[i]])}</small>`,t("Data confidence")]];
   if(P&&P.ov){const fo=P.ov.s.forest||[],pt=d3.sum(fo,x=>x[2]),la=(P.ov.s.licence_any||[[0,0,0]])[0][2],ln=(P.ov.s.licence_any||[[0,0,0,0,0,0]])[0][5]||0;
@@ -345,7 +357,7 @@ function renderProfile(){
   const mk=(title,tip,wide)=>{const d=document.createElement("div");d.className="ch"+(wide?" wide":"");d.innerHTML=`<h3 class="hasTip"${tipAttr(t(tip))}>${t(title)}</h3><div></div>`;charts.appendChild(d);return d.lastChild};
   lineChart(mk("Burned, % of peat per year","Burnt-area polygons, 2015 to 2026: the share of the KHG's peat burned in each year. 2026 is a partial year, drawn dashed."),{data:P.burned,color:"--hist",partial:2026,unit:"%",nd:1,ticks:[2015,2020,2025]});
   lineChart(mk("Hotspots on peat per year, VIIRS","FIRMS VIIRS S-NPP vegetation-fire hotspots that fall on peat, nominal and high confidence, per year."),{data:P.hs,color:"--hist",unit:"",nd:0,ticks:[2012,2016,2020,2024]});
-  lineChart(mk("Hotspots this year by month, KLH","KLH MODIS hotspots on peat in each month of this year, medium and high confidence.",true),{data:P.now_m.map(m=>[m[0],m[1]]),color:"--now",unit:"",nd:0,ticks:[1,3,5,7,9],tickFmt:m=>mon(m),xdom:[1,9]});
+  lineChart(mk("Hotspots this year by month, KLH","KLH MODIS hotspots on peat in each month of this year, medium and high confidence (high only when the filter is set).",true),{data:onlyHigh()?P.now_m.map(m=>[m[0],P.lay.now.filter(p=>p[2]===m[0]&&p[3]&&p[4]).length]):P.now_m.map(m=>[m[0],m[1]]),color:"--now",unit:"",nd:0,ticks:[1,3,5,7,9],tickFmt:m=>mon(m),xdom:[1,9]});
   lineChart(mk("Dry-season water deficit, mm","TerraClimate climatic water deficit summed over the dry months (June to October), in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.deficit,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
   lineChart(mk("Rain June to October, mm","TerraClimate rainfall in the dry months, in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.rain,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
   landBar(mk("Land cover","ESA WorldCover classes sampled at 250 m. Open land is grass, shrub, crop, built and bare. Shown for context, not scored.",true),P.lc);
@@ -365,8 +377,8 @@ function renderDataTable(P){
 function renderStrips(i){
   const host=$("#p-strips");host.innerHTML="";
   PR.forEach((p,k)=>{
-    const vals=[];for(let j=0;j<N;j++)if(R.elig[j]){const v=K.v[k][j];if(v!=null&&isFinite(v))vals.push(v)}
-    vals.sort(d3.ascending);const v=K.v[k][i];
+    const vals=[];for(let j=0;j<N;j++)if(R.elig[j]){const v=val(k,j);if(v!=null&&isFinite(v))vals.push(v)}
+    vals.sort(d3.ascending);const v=val(k,i);
     const row=document.createElement("div");row.className="strip";
     const w0=state.w[k];
     row.innerHTML=`<span class="t hasTip"${tipAttr(paramTip(p))}>${t(p.label)}<b>w ${fmt(w0,1)}</b></span><svg${tipAttr(t("Grey bars: how the ranked KHG are spread on this parameter. The marker is this KHG."))}></svg><span class="n"></span>`;host.appendChild(row);
@@ -490,7 +502,7 @@ function initProfileMap(){
 function applyLayerToggles(){
   if(!pmap||!pReady)return;
   const vis=(ids,on)=>ids.forEach(id=>pmap.setLayoutProperty(id,"visibility",on?"visible":"none"));
-  vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-m","p-now-h"],pLayers.now);
+  vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-h"],pLayers.now);vis(["p-now-m"],pLayers.now&&!onlyHigh());
   vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);
 }
 function setProfileData(P){
@@ -589,6 +601,7 @@ function staticTips(){
   T($("#minpeat").closest(".ctl"),"Peat area of a KHG, from the GFW peat extent. KHG with less peat than this are not ranked.");
   T($("#islands"),"Rank only the KHG on the chosen islands. Each parameter is scaled using only these KHG.");
   T($("#missing"),"How a KHG with no mapped canals is scored. Ignore: its canal parameters are left out. Average: it gets the average KHG value.");
+  T($("#conf"),"Confidence levels of this year's KLH hotspots that count. High only keeps the detections KLH rates Tinggi; the ranking and the profile numbers follow.");
   T($("#view"),"The top 30 at your weights, or the team's selected KHG with their rank.");
   T($("#rank-mode"),"Bars show what each group adds to the score. Table lists every parameter and can be searched and sorted.");
   T($("#map-legend"),"Score from 0 to 1. Grey: not ranked because of the filters.");
@@ -628,7 +641,7 @@ function setLang(l){
   mapLabels(nat);mapLabels(pmap);
   render();history.replaceState(null,"",hashState());
 }
-function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}`}
+function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.conf==="h"?"&c=h":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}`}
 function readHash(){
   const h=new URLSearchParams(location.hash.slice(1));
   if(h.get("l")==="id"||h.get("l")==="en")LANG=h.get("l");else LANG=(navigator.language||"").toLowerCase().startsWith("id")?"id":"en";
@@ -638,6 +651,7 @@ function readHash(){
   if(h.get("v")==="team"||h.get("v")==="top")state.view=h.get("v");
   if(h.get("t")==="dark"||h.get("t")==="light")document.documentElement.dataset.theme=h.get("t");
   if(h.get("i"))h.get("i").split(",").forEach(n=>state.islands.add(n));
+  if(h.get("c")==="h")state.conf="h";
   if(h.get("k"))state.sel=h.get("k");
 }
 

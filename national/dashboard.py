@@ -167,6 +167,9 @@ def build(cfg, top_n, out_path):
         "conf": conf.tolist(), "team": [team.get(k, "") for k in order],
         "ref_rank": [None if pd.isna(x) else int(x) for x in prof.peringkat],
         "has": [int(k in prof_ids) for k in order],
+        **({"n1h": [0.0 if pd.isna(u) or pd.isna(sh) else round(float(u) * float(sh), 4) for u, sh in zip(prof.u_hotspot_now, prof.hs_now_high_share)],
+            "n1hn": [0 if pd.isna(k) or pd.isna(sh) else int(round(float(k) * float(sh))) for k, sh in zip(prof.hs_now_kept, prof.hs_now_high_share)]}
+           if "hs_now_high_share" in prof and "u_hotspot_now" in prof else {}),
         "v": [[None if pd.isna(x) else round(float(x) * m, 4) for x in prof[c]] for _, c, _, _, _, m in PARAMS],
     }
 
