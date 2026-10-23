@@ -232,7 +232,22 @@ function newMap(container,opts){
 let nat=null,natReady=false;
 const NAT_BOUNDS=[[94.5,-11.5],[141.8,6.5]];
 function natGeo(){return {type:"FeatureCollection",features:DATA.geo.map((polys,i)=>({type:"Feature",id:i,properties:{team:K.team[i]?1:0},geometry:{type:"MultiPolygon",coordinates:polys}}))}}
+const natLayers={fill:true,team:true,labels:true};
+function applyNatLayers(){
+  if(!nat||!natReady)return;
+  const v=(id,on)=>{if(nat.getLayer(id))nat.setLayoutProperty(id,"visibility",on?"visible":"none")};
+  v("khg-fill",natLayers.fill);v("khg-team",natLayers.team);
+  for(const l of nat.getStyle().layers)if(l.type==="symbol")nat.setLayoutProperty(l.id,"visibility",natLayers.labels?"visible":"none");
+}
+function buildMapTools(){
+  const host=$("#map-tools");host.innerHTML="";
+  const lb=document.createElement("span");lb.className="lab";lb.textContent=t("Layers");host.appendChild(lb);
+  [["fill","KHG score",`<i class="poly" style="background:var(--ramp1)"></i>`,"Colour of each KHG by score. Off leaves only the outlines."],["team","Team KHG outline",`<i style="background:var(--ink);height:2px"></i>`,"Dark outline around the KHG selected by the team."],["labels","Place names",`<i class="poly" style="background:var(--muted)"></i>`,"Basemap place names."]]
+    .forEach(([k,tx,ic,tp])=>{const c=document.createElement("span");c.className="tg"+(natLayers[k]?"":" off");c.innerHTML=ic+t(tx);c.dataset.tip=t(tp);
+      c.onclick=()=>{natLayers[k]=!natLayers[k];c.classList.toggle("off",!natLayers[k]);applyNatLayers()};host.appendChild(c)});
+}
 function buildZoomButtons(){
+  buildMapTools();
   const isl=[["All",NAT_BOUNDS],["Sumatra",[[95,-6.5],[106.5,6]]],["Kalimantan",[[108,-4.5],[119.5,4.5]]],["Papua",[[130.5,-9.5],[141,0.5]]]];
   const zb=$("#zoom-btns");zb.innerHTML="";
   for(const [n,b] of isl){const btn=document.createElement("button");btn.type="button";btn.textContent=t(n);btn.onclick=()=>nat&&nat.fitBounds(b,{padding:16,duration:600});zb.appendChild(btn)}
@@ -248,7 +263,7 @@ function buildMap(){
     nat.addLayer({id:"khg-line",type:"line",source:"khg",paint:{"line-color":none,"line-width":1}},before);
     nat.addLayer({id:"khg-team",type:"line",source:"khg",filter:["==",["get","team"],1],paint:{"line-color":css("--ink"),"line-width":1.6}},before);
     nat.addLayer({id:"khg-sel",type:"line",source:"khg",paint:{"line-color":css("--now"),"line-width":["case",["boolean",["feature-state","sel"],false],3,0]}},before);
-    natReady=true;renderMap();
+    natReady=true;renderMap();applyNatLayers();
   });
   nat.on("mousemove","khg-fill",e=>{if(e.features.length){nat.getCanvas().style.cursor="pointer";showTip(tipFor(e.features[0].id),e.originalEvent)}});
   nat.on("mouseleave","khg-fill",()=>{nat.getCanvas().style.cursor="";hideTip()});
@@ -414,7 +429,7 @@ function landBar(host,lc){
 
 // map of one KHG: burn counts, canals by class, this year's hotspot points, on the basemap
 let pmap=null,pReady=false,pPending=undefined;
-const pLayers={burn:true,p:true,s:true,t:true,now:true};
+const pLayers={peat:true,burn:true,p:true,s:true,t:true,now:true};
 const EMPTY={type:"FeatureCollection",features:[]};
 const pOv={mode:"off",vil:false};
 const OVCLS={
@@ -433,7 +448,7 @@ function pTheme(){
   const ramp=d3.interpolateRgb(css("--ramp0"),css("--ramp1")),on=css("--now"),sf=css("--surface");
   pmap.setPaintProperty("p-burn","fill-color",["match",["get","n"],1,ramp(.25),2,ramp(.5),3,ramp(.75),ramp(1)]);
   for(const id of ["p-canal-p","p-canal-s","p-canal-t"])pmap.setPaintProperty(id,"line-color",css("--canal"));
-  pmap.setPaintProperty("p-outline","line-color",css("--ink"));
+  pmap.setPaintProperty("p-outline","line-color",css("--ink"));pmap.setPaintProperty("p-peat","fill-color",css("--peat"));
   pmap.setPaintProperty("p-ov-forest","fill-color",ovMatch("forest"));pmap.setPaintProperty("p-ov-feg","fill-color",ovMatch("feg"));
   pmap.setPaintProperty("p-ov-lic","fill-color",ovMatch("licence"));pmap.setPaintProperty("p-ov-lic-line","line-color",ovMatch("licence"));
   pmap.setPaintProperty("p-ov-vil","line-color",ovColor("village","in"));
@@ -444,6 +459,8 @@ function initProfileMap(){
   pmap.on("load",()=>{
     const before=firstSymbol(pmap);
     for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now"])pmap.addSource(s,{type:"geojson",data:EMPTY});
+    pmap.addSource("p-peat",{type:"geojson",data:EMPTY});
+    pmap.addLayer({id:"p-peat",type:"fill",source:"p-peat",paint:{"fill-color":"#a58660","fill-opacity":.38}},before);
     for(const s of ["p-ov-forest","p-ov-feg","p-ov-lic","p-ov-vil"])pmap.addSource(s,{type:"geojson",data:EMPTY});
     const fillOv=(id,src,op)=>pmap.addLayer({id,type:"fill",source:src,layout:{visibility:"none"},paint:{"fill-color":"#888","fill-opacity":op}},before);
     fillOv("p-ov-forest","p-ov-forest",.55);fillOv("p-ov-feg","p-ov-feg",.55);fillOv("p-ov-lic","p-ov-lic",.38);
@@ -473,17 +490,18 @@ function initProfileMap(){
 function applyLayerToggles(){
   if(!pmap||!pReady)return;
   const vis=(ids,on)=>ids.forEach(id=>pmap.setLayoutProperty(id,"visibility",on?"visible":"none"));
-  vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-m","p-now-h"],pLayers.now);
+  vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-m","p-now-h"],pLayers.now);
   vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);
 }
 function setProfileData(P){
   const fc=f=>({type:"FeatureCollection",features:f});
-  if(!P){for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-vil"])pmap.getSource(s).setData(EMPTY);return}
+  if(!P){for(const s of ["p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-now","p-peat","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-vil"])pmap.getSource(s).setData(EMPTY);return}
   const L=P.lay,pairs=a=>{const c=[];for(let j=0;j<a.length;j+=2)c.push([a[j],a[j+1]]);return c};
   pmap.getSource("p-burn").setData(fc(L.burn.map(b=>({type:"Feature",properties:{n:b.n},geometry:{type:"MultiPolygon",coordinates:b.r}}))));
   pmap.getSource("p-outline").setData(fc([{type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates:L.outline}}]));
   for(const [k,id] of [["t","p-canal-t"],["s","p-canal-s"],["p","p-canal-p"]])pmap.getSource(id).setData(fc(L.canals[k].map(a=>({type:"Feature",properties:{},geometry:{type:"LineString",coordinates:pairs(a)}}))));
   pmap.getSource("p-now").setData(fc(L.now.map(p=>({type:"Feature",properties:{m:p[2],h:p[3],p:p[4]},geometry:{type:"Point",coordinates:[p[0],p[1]]}}))));
+  pmap.getSource("p-peat").setData(fc((L.peat&&L.peat.length)?[{type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates:L.peat}}]:[]));
   const O=L.ov||{},poly=(arr,f)=>fc((arr||[]).map(x=>({type:"Feature",properties:f(x),geometry:{type:"MultiPolygon",coordinates:x.r}})));
   pmap.getSource("p-ov-forest").setData(poly(O.forest,x=>({c:x.c})));pmap.getSource("p-ov-feg").setData(poly(O.feg,x=>({c:x.c})));
   pmap.getSource("p-ov-lic").setData(poly(O.licence,x=>({c:x.c,n:x.n})));pmap.getSource("p-ov-vil").setData(poly(O.village,x=>({n:x.n})));
@@ -493,17 +511,18 @@ function drawMap(P){
   if(!pmap)initProfileMap();
   pPending=P;if(pmap&&pReady)setProfileData(P);
   const tools=$("#p-tools");tools.innerHTML="";
+  if(P){const lb0=document.createElement("span");lb0.className="lab";lb0.textContent=t("Layers");tools.appendChild(lb0)}
   if(!P){$("#p-foot").textContent="";$("#p-ov-leg").innerHTML="";return}
-  const T=[["burn","Burned, times",`<i style="background:var(--hist)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. Darker means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"KLH MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
+  const T=[["peat","Peat extent",`<i class="poly" style="background:var(--peat)"></i>`,"Peat extent used for the rates (GFW composite, 76 m): the area that burned area and hotspots are divided by."],["burn","Burned, times",`<i class="poly" style="background:var(--hist)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. Darker means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"KLH MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
   T.forEach(([k,tx,ic,tp])=>{const s=document.createElement("span");s.className="tg"+(pLayers[k]?"":" off");s.innerHTML=ic+t(tx,{n:P.lay.now_total||P.lay.now.length});s.dataset.tip=t(tp);s.onclick=()=>{pLayers[k]=!pLayers[k];s.classList.toggle("off",!pLayers[k]);applyLayerToggles()};tools.appendChild(s)});
   if(P.lay.ov){
-    const lb=document.createElement("span");lb.className="lab";lb.textContent=t("Land status");tools.appendChild(lb);
+    const grp=document.createElement("span");grp.className="tgrp";tools.appendChild(grp);const lb=document.createElement("span");lb.className="lab";lb.textContent=t("Land status");grp.appendChild(lb);
     const seg=document.createElement("span");seg.className="seg";
     [["off","Off"],["forest","Forest area"],["feg","Peat function"],["licence","Licences"]].forEach(([k,l])=>{const b=document.createElement("button");b.type="button";b.textContent=t(l);b.dataset.tip=t(ovTip[k]);b.className=pOv.mode===k?"on":"";
       b.onclick=()=>{pOv.mode=k;[...seg.children].forEach(x=>x.classList.toggle("on",x===b));applyLayerToggles();ovLegend(P)};seg.appendChild(b)});
-    tools.appendChild(seg);
+    grp.appendChild(seg);
     const v=document.createElement("span");v.className="tg"+(pOv.vil?"":" off");v.innerHTML=`<i style="border-top:2px dashed ${ovColor("village","in")};height:0;background:none"></i>`+t("Target villages");v.dataset.tip=t("Target villages of the 2026 Bluebook for peat ecosystem restoration. Hover for the village.");
-    v.onclick=()=>{pOv.vil=!pOv.vil;v.classList.toggle("off",!pOv.vil);applyLayerToggles()};tools.appendChild(v);
+    v.onclick=()=>{pOv.vil=!pOv.vil;v.classList.toggle("off",!pOv.vil);applyLayerToggles()};grp.appendChild(v);
   }
   ovLegend(P);
   $("#p-foot").innerHTML=t("Filled dot: on peat. Hollow: off peat. Large: high confidence.")+(P.lay.now_total>P.lay.now.length?" "+t("Showing {a} of {b} points.",{a:P.lay.now.length,b:P.lay.now_total}):"")+" "+t("Basemap needs internet.");

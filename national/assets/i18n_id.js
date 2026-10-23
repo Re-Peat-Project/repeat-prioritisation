@@ -183,5 +183,14 @@ const ID={
 "KLH MODIS hotspots on peat this year, medium and high confidence.":"Titik panas MODIS KLH di gambut tahun ini, kepercayaan sedang dan tinggi.",
 "of the peat":"dari gambut",
 "of the burned peat":"dari gambut terbakar",
-"of the hotspots":"dari titik panas"
+"of the hotspots":"dari titik panas",
+"Layers":"Layer",
+"Peat extent":"Sebaran gambut",
+"Peat extent used for the rates (GFW composite, 76 m): the area that burned area and hotspots are divided by.":"Sebaran gambut yang dipakai untuk menghitung laju (komposit GFW, 76 m): luas pembagi bagi area terbakar dan titik panas.",
+"KHG score":"Skor KHG",
+"Colour of each KHG by score. Off leaves only the outlines.":"Warna tiap KHG menurut skor. Jika mati, hanya garis tepi yang tersisa.",
+"Team KHG outline":"Garis tepi KHG tim",
+"Dark outline around the KHG selected by the team.":"Garis tepi gelap di sekeliling KHG pilihan tim.",
+"Place names":"Nama tempat",
+"Basemap place names.":"Nama tempat pada peta dasar."
 };

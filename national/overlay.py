@@ -94,6 +94,25 @@ def now_points(cfg, g):
     return xs, ys, h["layer"].str[:2].astype(int).to_numpy(), (lvl == "high").to_numpy(), onp
 
 
+def peat_shape(cfg, g, tol):
+    """The peat cells of the GFW extent inside g as one lon/lat geometry, simplified; None when the extent is missing."""
+    pe = peat_path(cfg)
+    if not pe:
+        return None
+    from rasterio.features import shapes
+    ps = P.PeatSampler(pe)
+    arr, tr = ps.window(g)
+    m = arr == 1
+    if not m.any():
+        return None
+    inv = Transformer.from_crs(ps.src.crs, 4326, always_xy=True)
+    polys = [shapely.geometry.shape(geom) for geom, _ in shapes(m.astype(np.uint8), mask=m, transform=tr)]
+    u = shapely.ops.transform(inv.transform, shapely.union_all(polys))
+    u = shapely.intersection(shapely.make_valid(u), g).simplify(tol, preserve_topology=True)
+    keep = [p for p in (u.geoms if u.geom_type.startswith("Multi") else [u]) if p.geom_type == "Polygon" and p.area > (3 * tol) ** 2]
+    return shapely.MultiPolygon(keep) if keep else None
+
+
 def grid(g_ll, cell=None):
     """Regular grid of points inside g (lon, lat arrays) and the cell area in km2."""
     tf, inv = Transformer.from_crs(4326, P.AEA, always_xy=True), Transformer.from_crs(P.AEA, 4326, always_xy=True)

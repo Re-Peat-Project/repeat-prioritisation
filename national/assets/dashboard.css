@@ -1,13 +1,13 @@
 :root{color-scheme:light;
   --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);
   --hist:#2a78d6;--now:#eb6834;--canal:#1baf7a;--wash:rgba(42,120,214,.08);
-  --ramp0:#cde2fb;--ramp1:#0d366b;--none:#e8e7e1;--icon-filter:none;--shadow:0 4px 18px rgba(0,0,0,.14)}
+  --ramp0:#cde2fb;--ramp1:#0d366b;--peat:#a58660;--none:#e8e7e1;--icon-filter:none;--shadow:0 4px 18px rgba(0,0,0,.14)}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
   --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
-  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}}
+  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}}
 :root[data-theme=dark]{color-scheme:dark;
   --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
-  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}
+  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -159,3 +159,10 @@ tbody tr:hover,tbody tr.sel{background:var(--wash)}
 #p-ov-leg{margin:6px 0 0;min-height:0}
 #p-ov-leg:empty{display:none}
 .ovact th:nth-child(-n+2),.ovact td:nth-child(-n+2){text-align:left}
+.tg::before{content:"";flex:none;width:10px;height:10px;border:1.5px solid var(--ink2);border-radius:3px;background:var(--ink2)}
+.tg.off::before{background:transparent}
+.tg i.poly{width:12px;height:9px;border-radius:2px}
+.map-tools{align-items:center}
+#mapcard .map-tools{margin-bottom:6px}
+.map-tools .lab{margin-right:2px}
+.tgrp{display:flex;flex-basis:100%;align-items:center;gap:6px;flex-wrap:wrap}

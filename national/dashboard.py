@@ -26,7 +26,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from national import profile as P  # noqa: E402
+from national import profile as P
+from national import overlay as O  # noqa: E402
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -93,6 +94,8 @@ def profile_layers(cfg, row, years):
                 if not u.is_empty:
                     burn.append({"n": k, "r": rings(u, tol)})
     out["burn"] = burn
+    pg = O.peat_shape(cfg, g, tol * 1.5)
+    out["peat"] = rings(pg, 0) if pg is not None else []
     c = P._read_mask(data / inp["canals"], g, columns=["KODE_KANAL"])
     canals = {"p": [], "s": [], "t": []}
     if len(c):
