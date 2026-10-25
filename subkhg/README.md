@@ -25,7 +25,7 @@ python -m subkhg.run --config configs/local/subkhg.yaml --skip-fetch        # re
 For a real KHG, first cut the national vector files down to that KHG (runs otherwise re-read hundreds of MB each time), keeping only the features you need:
 
 ```bash
-python -m subkhg.prepare_inputs --khg-shp <KHG shapefile> --khg-id 71 --out data_local/kampar_gaung \
+python -m subkhg.prepare_inputs --khg-shp <KHG shapefile> --khg-id 71 --out $REPEAT_KHG/14.02-04-05.01_kampar_gaung/00_inputs \
     --canals kanal.gpkg --rivers sungai.gpkg --blocks infrastruktur.gpkg \
     --blocks-where "Jenis == 'Sekat Kanal' and KETERANGAN == 'REALISASI'"
 ```
@@ -113,7 +113,7 @@ Another analysis plugs in by returning a table with a `unit_id` column and indic
 A column with the same name as a computed one replaces it, so a finer water balance can replace `u_wb_mean`. A new indicator is scored once it has a weight. Its group defaults to its prefix and its direction to higher = more need:
 
 ```yaml
-extra_indicators: [out_neraca/neraca_unit.csv]
+extra_indicators: [${REPEAT_KHG}/<code>_<name>/03_neraca/runs/<run>/neraca_unit.csv]
 indicators:
   u_nab_deficit: {weight: 2.0}                # group u (need), higher = more need
   f_something:   {weight: 1.0, direction: -1}

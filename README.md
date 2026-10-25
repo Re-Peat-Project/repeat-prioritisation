@@ -246,7 +246,7 @@ The consistency ratio is reported; above 0.10 triggers a warning.
 
 ### A real-data run
 
-`re-peat/sites/kampar_gaung/README.md` (the hub) is the worked example: Sungai Kampar - Sungai Gaung, from clipping the inputs to the report, with
+`re-peat/sites/14.02-04-05.01_kampar_gaung/README.md` (the hub) is the worked example: Sungai Kampar - Sungai Gaung, from clipping the inputs to the report, with
 the commands, the settings and why each was chosen. Its configs use `${REPEAT_DATA}` and `${SITMAT_PROCESSED}` for data kept
 outside the repo: `${NAME}` in any config value is replaced by the environment variable, and a missing variable stops with a
 message. Every analysis behind a number in the docs is a command in the repo (see `scripts/README.md`), not a throwaway.

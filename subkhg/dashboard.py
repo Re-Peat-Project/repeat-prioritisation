@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build the HTML page that explains sub-KHG delineation and prioritisation and shows a run's outputs on a map.
 
-  python -m subkhg.dashboard --subkhg-config ../re-peat/sites/kampar_gaung/subkhg.yaml \\
-      --neraca-config ../re-peat/sites/kampar_gaung/neraca_experiments.yaml --out docs/process/subkhg_process.html
+  python -m subkhg.dashboard --subkhg-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml \\
+      --neraca-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/neraca_experiments.yaml --out docs/process/subkhg_process.html
 
 One self-contained file (no server, no internet): the process diagram with the numbers of the run, the delineation funnel,
 a map of the sub-KHG coloured by any output or indicator (with canals, rivers, canal blocks and water-table stations as
@@ -226,7 +226,7 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
             f"Canals and rivers are burned 3 m into the DTM. Pits, depressions and flats are filled; D8 flow direction and accumulation follow (pysheds).",
             f"Outlet channels are the primary canals and rivers (plus DEM streams of order >= k only if that is needed to reach the target count). Each cell is traced downstream to its outlet; a sub-KHG is the catchment of one outlet reach on one bank.",
             f"Of {pieces} catchment pieces, those smaller than {min_area:g} km2" + (" (<code>min_area_km2: auto</code>: the smallest value that gives at most 30 units)" if auto else "") + f" are merged, smallest first, into the neighbour they share the longest divide with ({merge} merge; outlet channels only if there is no divide neighbour). Result: {n_units} sub-KHG of {g.area_km2.min():.0f} to {g.area_km2.max():.0f} km2.",
-            "Command: <code>python -m repeat_delineation --config ../re-peat/sites/kampar_gaung/delineate.yaml</code>"]},
+            "Command: <code>python -m repeat_delineation --config ../re-peat/sites/14.02-04-05.01_kampar_gaung/delineate.yaml</code>"]},
         "p_fetch": {"title": "2 Fetch cloud layers (common/sources.py)", "body": [f"One 30 m grid per KHG; layers are written to <code>cache/{kid}/</code> and never refetched (the cache is keyed by file name).",
                                                                                     f"Baseline {base}. Command: <code>python -m subkhg.run --config ... --fetch-only</code>."]},
         "p_ind": {"title": "3 Indicators per sub-KHG (common/indicators.py)", "body": [

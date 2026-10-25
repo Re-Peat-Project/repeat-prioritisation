@@ -10,7 +10,7 @@ repeat them. Run them from the repo root with the project environment (`PYTHONPA
 | `check_tma_vs_sitmat.py` | Does our SiTMAT reader agree with the sitmat-extract project's own summary? | README, water table (TMA) |
 | `check_era5_vs_terraclimate.py` | How close is ERA5 to TerraClimate for one month of one KHG? | `docs/data_sources.md`, fallback for the TerraClimate gap |
 | `forcing_test.sh <khg>` (moved to repeat-neraca) | Does finer rain (CHIRPS v3, 5 km) or evaporation (WaPOR v3, 300 m) than ERA5 improve the neraca air calibration? Then `python -m repeat_neraca.bucket.forcing_compare` tabulates the runs | `repeat-neraca/docs/bucket_reports/<khg>_forcing_test.md`, `repeat_neraca.bucket/README.md` |
-| `index_repeat_data.py` | Which DTM and peat depth rasters cover which KHG boundary? | `re-peat/sites/kampar_gaung/README.md`, step 0 (`re-peat/sites/repeat_data_index.csv`) |
+| `index_repeat_data.py` | Which DTM and peat depth rasters cover which KHG boundary? | `re-peat/sites/14.02-04-05.01_kampar_gaung/README.md`, step 0 (`re-peat/sites/repeat_data_index.csv`) |
 
 The checks that belong to a particular run are commands of the packages, not scripts: `python -m subkhg.check_inputs`
 (the inputs of a run), `python -m repeat_neraca.bucket.export_inputs` (repeat-neraca) (the daily forcing and station files for the physical neraca air in `re-peat`), `python -m repeat_neraca.bucket.covariates` (what explains the station water tables), `python -m repeat_neraca.bucket.sentinel1` and `python -m repeat_neraca.bucket.radar_temporal` (what Sentinel-1 radar can tell about the station water tables) and

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Write a markdown report of a real-data run from its output folders, so the numbers can be regenerated.
 
-  python -m subkhg.report --subkhg-config ../re-peat/sites/kampar_gaung/subkhg.yaml \\
-      --neraca-config ../re-peat/sites/kampar_gaung/neraca_experiments.yaml --out ../re-peat/sites/kampar_gaung/reports/kampar_gaung.md
+  python -m subkhg.report --subkhg-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml \\
+      --neraca-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/neraca_experiments.yaml --out ../re-peat/sites/14.02-04-05.01_kampar_gaung/reports/kampar_gaung.md
 
 Reads the outputs of repeat_delineation, repeat_neraca.bucket.run (and repeat_neraca.bucket.covariates if it was run) and subkhg.run.
 The report states facts and numbers only; what they mean and the decisions taken are in the run's runbook.

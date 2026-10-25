@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cut the big national vector files down to one KHG, so runs do not re-read hundreds of MB each time.
 
-  python -m subkhg.prepare_inputs --khg-shp <KHG shapefile> --khg-id 71 --out data_local/kampar_gaung \\
+  python -m subkhg.prepare_inputs --khg-shp <KHG shapefile> --khg-id 71 --out $REPEAT_KHG/14.02-04-05.01_kampar_gaung/00_inputs \\
       --canals kanal.gpkg --rivers sungai.gpkg --lakes danau.gpkg \\
       --blocks infrastruktur.gpkg --blocks-where "Jenis == 'Sekat Kanal' and KETERANGAN == 'REALISASI'"
 
