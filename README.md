@@ -1,33 +1,34 @@
-# prioritas_khg: rewetting prioritisation for KHG, in Python
+# repeat-prioritisation: rewetting prioritisation for KHG, in Python
 
-Two separate programs answer two different questions about peat rewetting. They share one data and indicator engine (`common/`) but have their own entry point, scoring and README.
+A Python package (`repeat_prioritisation`, version 0.1.0). Method of the sub-KHG ranking: [docs/subkhg-method.md](docs/subkhg-method.md) (diagram [docs/figures/subkhg_method.drawio](docs/figures/subkhg_method.drawio)); national profile: the hub's `docs/15-national-profile.md`.
+
+Two separate programs answer two different questions about peat rewetting. They share one data and indicator engine (`repeat_prioritisation.common`) but have their own entry point, scoring and README.
 
 | | **National** (`national/`) | **Sub-KHG** (`subkhg/`) |
 |---|---|---|
 | Question | Which KHG should get attention? | Inside a KHG, which sub-KHG needs the most intervention (sekat kanal, sumur bor, pompa)? |
-| Run | `python -m national.run` | `python -m subkhg.run` |
+| Run | `repeat-national-run` | `repeat-subkhg` |
 | Unit | one unit per KHG | sub-KHG delineated automatically from the DTM, or hexagons, or your polygons |
 | Grid | 250 m | 30 m |
 | Layers | Coarse, wall-to-wall: climate, burned area, hotspots, peat depth, protected peat, canal density. No Sentinel-2, no feasibility. | Everything: NDMI, DTM, canal reach, pumping lift, metrik IPG, tidal zone, concessions |
 | Ranking | Risk tertiles: Fokus nasional tinggi / sedang / rendah | **Need** tertiles: Kebutuhan intervensi tinggi / sedang / rendah. Feasibility is reported but does not change the rank. |
 | Scoring code | `common/scoring.py` | `subkhg/prioritise.py` (reuses the shared normalisation, sensitivity and validation) |
-| Details | this README | [subkhg/README.md](subkhg/README.md) |
+| Details | this README | [docs/subkhg-method.md](docs/subkhg-method.md), [src/repeat_prioritisation/subkhg/README.md](src/repeat_prioritisation/subkhg/README.md) |
 
 ```
-configs/    example configs (national, subkhg), small smoke-test configs (configs/smoke/), your own go in configs/local/. The real-site configs (Kampar - Gaung, Sugihan - Lumpur) are in the hub: re-peat/sites/<khg>/
-docs/       data_sources.md: providers (incl. BMKG), what was tested, ERA5 notes; prior_method.md: the team's earlier rank-sum method
-            the real-data runbooks and reports moved to the hub: re-peat/sites/<khg>/
-tests/fixtures/  small test inputs: KHG polygons and a prefetched 2021 cache for one KHG
-common/     the prioritisation engine: indicators, scoring functions, pipeline. Grid, sources, tma and htmlkit now live in the repeat-common repo (import repeat_common); docs/data_sources.md lists the providers
-national/   run.py                                national entry point and preset
-subkhg/     run.py                                sub-KHG entry point and preset
-            prepare_inputs.py                     clip the national vector files to one KHG: python -m subkhg.prepare_inputs
-            prioritise.py                         need ranking (score_need)
-            README.md                             full description of the sub-KHG program
-(neraca air is the repeat-neraca repository; its sub-KHG table joins here through extra_indicators)
-scripts/                                          one-question tools behind the numbers in docs/ (see scripts/README.md)
-tests/                                            checks that need no data: python -m tests.test_ranksum
-data_local/                                       your clipped copies of big inputs and the derived data of a run (not tracked)
+src/repeat_prioritisation/
+  common/        the prioritisation engine: indicators, scoring functions, pipeline (grid, sources and tma are in repeat-common)
+  national/      national profile and ranking of all KHG (profile.py), engine run on shortlisted KHG (run.py), stage 3, overlays,
+                 dashboard (assets/: template, D3, MapLibre, i18n_id.js)
+  subkhg/        sub-KHG ranking: run.py, prepare_inputs.py, check_inputs.py, prioritise.py (score_need), national_layers.py
+                 (fire and canals as the national profile counts them), priority_export.py, report.py, dashboard.py
+  investigations/ one-off reports (airport, DMPG)
+configs/         example configs (national, subkhg), smoke-test configs (configs/smoke/); your own go in configs/local/.
+                 Real-site configs are in the hub: re-peat/sites/<khg>/
+docs/            subkhg-method.md (the method), figures/, data_sources.md, prior_method.md (the team's earlier rank-sum)
+scripts/         one-question tools behind the numbers in the docs (see scripts/README.md), validate_subkhg.py
+tests/           pytest; tests/fixtures/: small inputs and a prefetched 2021 cache
+(neraca air is the repeat-neraca package; its sub-KHG table joins here through extra_indicators)
 ```
 
 How the pieces connect:
@@ -43,7 +44,7 @@ subkhg.run ───► common.pipeline ─┬─ subkhg_units.gpkg (repeat-deli
                                  + extra indicator tables (files or functions, e.g. neraca air from the repeat-neraca repository)
 ```
 
-The stages exchange files: the `repeat-delineation` repository writes `subkhg_units.gpkg`, which a run here reads as `units: {mode: vector}`. Other analyses add indicator columns by `unit_id` (`extra_indicators`, see [subkhg/README.md](subkhg/README.md)).
+The stages exchange files: the `repeat-delineation` repository writes `subkhg_units.gpkg`, which a run here reads as `units: {mode: vector}`. Other analyses add indicator columns by `unit_id` (`extra_indicators`, see [src/repeat_prioritisation/subkhg/README.md](src/repeat_prioritisation/subkhg/README.md)).
 
 `common.pipeline.main` takes the program-specific steps as hooks (`delineate`, `score`), so each program only supplies what is different. Changing one program does not change the other.
 
@@ -51,15 +52,15 @@ It is the Python alternative to a GEE workflow: layers are read from cloud-nativ
 
 ## National profile from local layers
 
-`python -m national.profile` and `python -m national.dashboard` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an interactive dashboard (D3, vendored in `national/assets`). They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m tests.test_national_profile`.
+`repeat-national-profile` and `repeat-national-dashboard` profile and rank all 865 KHG from the vector layers in `REPEAT_DATA` (burned area, VIIRS hotspots, canals, structures, villages, peat depth, SiTMAT), with no cloud fetch, and write an interactive dashboard (D3, vendored in `national/assets`). They reuse `common.scoring`. Method, decisions and commands: the hub's `docs/15-national-profile.md`; config: `configs/examples/national_profile.yaml`; test: `python -m pytest tests/test_national_profile.py`.
 
 ## Investigations
 
-`python -m investigations.airport --config configs/investigations/banjarbaru.yaml` writes a one-page report on fire near an airport and the KHG around it (runway against the KHG, peat from three sources, hotspots and burned area split into peat soil, mineral soil and outside the KHG, and the airport's METAR visibility, smoke and wind). Output: `${REPEAT_WORK}/investigations/banjarbaru.html`; `--reassemble` reuses the data. Inputs come from `repeat_common.fetch_klhk_peat`, `fetch_peat_extent --extra` and `fetch_metar`.
+`python -m repeat_prioritisation.investigations.airport --config configs/investigations/banjarbaru.yaml` writes a one-page report on fire near an airport and the KHG around it (runway against the KHG, peat from three sources, hotspots and burned area split into peat soil, mineral soil and outside the KHG, and the airport's METAR visibility, smoke and wind). Output: `${REPEAT_WORK}/investigations/banjarbaru.html`; `--reassemble` reuses the data. Inputs come from `repeat_common.fetch_klhk_peat`, `fetch_peat_extent --extra` and `fetch_metar`.
 
 ## Sub-KHG program
 
-Delineation, the need ranking and its indicators are described in [subkhg/README.md](subkhg/README.md). The sections below describe the shared engine and the national ranking. Where the sub-KHG program differs, they say so.
+The method of the sub-KHG ranking is in [docs/subkhg-method.md](docs/subkhg-method.md); options and configuration in [src/repeat_prioritisation/subkhg/README.md](src/repeat_prioritisation/subkhg/README.md). The sections below describe the shared engine and the national ranking. Where the sub-KHG program differs, they say so.
 
 ## Shared engine and national scoring
 
@@ -88,7 +89,7 @@ KHG boundary ─► units (1 km² hexagons, or your sub-KHG polygons)
 
 ### Indicators
 
-In the national run the indicator groups are urgency (`u_`), impact (`i_`) and feasibility (`f_`). The sub-KHG program regroups some of them (canal reach, distance to water, forest share); see [subkhg/README.md](subkhg/README.md).
+In the national run the indicator groups are urgency (`u_`), impact (`i_`) and feasibility (`f_`). The sub-KHG program regroups some of them (canal reach, distance to water, forest share); see [docs/subkhg-method.md](docs/subkhg-method.md).
 
 | Code | Meaning | Source (default) | Direction |
 |---|---|---|---|
@@ -155,21 +156,22 @@ In the national run (`scoring.national: true`) the classes are **Fokus nasional:
 ## Run
 
 ```bash
-pip install -r requirements.txt     # or: uv pip install -r requirements.txt
+pip install ../repeat-common                 # not on PyPI: install from its folder or GitHub first
+pip install -e ".[dev]"                      # this package and its commands; python -m pytest -q to check
 mkdir -p configs/local
 # national: which KHG?
-python -m national.run --print-default-config > configs/local/national.yaml
-python -m national.run --config configs/local/national.yaml        # writes khg_terpilih.gpkg (top KHG)
+repeat-national-run --print-default-config > configs/local/national.yaml
+repeat-national-run --config configs/local/national.yaml        # writes khg_terpilih.gpkg (top KHG)
 
 # sub-KHG: which sub-KHG inside the chosen KHG?
 # first, in the repeat-delineation repo: python -m repeat_delineation --config <delineate.yaml>   (writes subkhg_units.gpkg; check the polygons)
-python -m subkhg.run --print-default-config > configs/local/subkhg.yaml     # edit paths and years
-python -m subkhg.run --config configs/local/subkhg.yaml                     # fetch missing layers, score
-python -m subkhg.run --config configs/local/subkhg.yaml --fetch-only        # just build the cache
-python -m subkhg.run --config configs/local/subkhg.yaml --skip-fetch        # re-score from cache (e.g. new weights)
+repeat-subkhg --print-default-config > configs/local/subkhg.yaml     # edit paths and years
+repeat-subkhg --config configs/local/subkhg.yaml                     # fetch missing layers, score
+repeat-subkhg --config configs/local/subkhg.yaml --fetch-only        # just build the cache
+repeat-subkhg --config configs/local/subkhg.yaml --skip-fetch        # re-score from cache (e.g. new weights)
 ```
 
-Run from the repo root. Both programs accept `--config`, `--khg`, `--out`, `--fetch-only` and `--skip-fetch`. `configs/examples/national.example.yaml` and `configs/examples/subkhg.example.yaml` hold the defaults of each program; put your own in `configs/local/` (not tracked). Set `khg` in the sub-KHG config to `khg_terpilih.gpkg` to continue from the national shortlist.
+Commands: `repeat-subkhg`, `repeat-subkhg-prepare`, `repeat-subkhg-check`, `repeat-subkhg-report`, `repeat-subkhg-dashboard`, `repeat-national-profile`, `repeat-national-run`, `repeat-national-stage3`, `repeat-national-overlay`, `repeat-national-dashboard` (each is also `python -m repeat_prioritisation.<program>.<module>`). Relative paths in the example configs assume the repo root as working folder. Both programs accept `--config`, `--khg`, `--out`, `--fetch-only` and `--skip-fetch`. `configs/examples/national.example.yaml` and `configs/examples/subkhg.example.yaml` hold the defaults of each program; put your own in `configs/local/` (not tracked). Set `khg` in the sub-KHG config to `khg_terpilih.gpkg` to continue from the national shortlist.
 
 `params.peat_depth_scale` turns the peat depth raster into metres (default 1). A raster in centimetres needs `0.01`; the water stock indicator is in metres.
 
@@ -198,7 +200,7 @@ For the operational ranking (rather than validation), set `baseline` to include 
 
 ### Water table (TMA)
 
-`common/tma.py` turns the input into one table (`station_id, date, depth_m, lon, lat`, depth positive below the surface), and `indicators.py` only reads that table. `tma.path` picks the format:
+`repeat_common.tma` turns the input into one table (`station_id, date, depth_m, lon, lat`, depth positive below the surface), and `indicators.py` only reads that table. `tma.path` picks the format:
 
 - **A folder: SiTMAT extract** (the `sitmat_out/processed/` folder of the sitmat-extract project: `daily_long.csv` + `stations.csv`, and `stations_geo.csv` if present). `water_level_cm` is negative below the surface, so `depth_m = -cm / 100`.
 - **A file: CSV** with `station_id, date, wtd_m, lon, lat`. Set `params.tma_depth_positive` to say how the sign works. Left unset, the absolute value is used and a warning is logged, which counts flooded readings as deep.
@@ -256,8 +258,8 @@ message. Every analysis behind a number in the docs is a command in the repo (se
 Each program runs on its own on the small inputs in `tests/fixtures/`. Outputs go to `var/out/smoke/`, which git ignores.
 
 ```bash
-python -m subkhg.run --config configs/smoke/subkhg.yaml --skip-fetch                # 49 hexagons in a Riau KHG, from the prefetched cache, ~10 s
-python -m national.run --config configs/smoke/national.yaml                         # 3 small KHG, fetches the 2021 layers, ~2 min
+repeat-subkhg --config configs/smoke/subkhg.yaml --skip-fetch                # 49 hexagons in a Riau KHG, from the prefetched cache, ~10 s
+repeat-national-run --config configs/smoke/national.yaml                         # 3 small KHG, fetches the 2021 layers, ~2 min
 ```
 
 All three ran on 2026-10-15. The sub-KHG smoke test has no canals, peat depth or roads, so only a few indicators are scored: it checks that the pipeline runs, not that the ranking is right.

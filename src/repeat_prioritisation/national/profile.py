@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """National KHG profile and ranking from the local vector layers (no cloud fetch): all KHG, one row each.
 
-  python -m national.profile --config configs/examples/national_profile.yaml [--mode validate|operational]
+  repeat-national-profile --config configs/examples/national_profile.yaml [--mode validate|operational]
                              [--only KHG.16.02.01 ...] [--out DIR]
 
 Per KHG, from the files in REPEAT_DATA: burned area per year and repeat burns (burnt-area polygons), hotspots per
@@ -35,8 +35,7 @@ import yaml
 from rasterio.features import geometry_mask
 from rasterio.windows import Window
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from common import scoring as SC  # noqa: E402
+from repeat_prioritisation.common import scoring as SC  # noqa: E402
 
 log = logging.getLogger("prioritas.profile")
 
@@ -379,10 +378,12 @@ def tma_by_khg(tcfg, khg):
     return out
 
 
-def build_profile(cfg, only=None):
+def build_profile(cfg, only=None, khg=None):
+    """khg: polygons to profile instead of the national KHG (columns khg_id, geometry in EPSG:4326, area_km2, geom_aea),
+    for example the sub-KHG units of one KHG (subkhg.national_layers), so both levels count fire and canals the same way."""
     data, inp = Path(cfg["data"]), cfg["inputs"]
     yb, yv = cfg["years"]["baseline"], cfg["years"]["validation"]
-    khg = load_khg(cfg, only)
+    khg = load_khg(cfg, only) if khg is None else khg
     log.info("%d KHG", len(khg))
     p = lambda k: data / inp[k]
 

@@ -4,7 +4,7 @@ import copy
 import numpy as np
 import pandas as pd
 
-from national import profile as P
+from repeat_prioritisation.national import profile as P
 
 
 def _prof(n=90, seed=1):

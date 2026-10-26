@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the HTML page that explains sub-KHG delineation and prioritisation and shows a run's outputs on a map.
 
-  python -m subkhg.dashboard --subkhg-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml \\
+  repeat-subkhg-dashboard --subkhg-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml \\
       --neraca-dir $REPEAT_KHG/14.02-04-05.01_kampar_gaung/03_neraca --out docs/process/subkhg_process.html
 
 One self-contained file (no server, no internet): the process diagram with the numbers of the run, the delineation funnel,
@@ -21,8 +21,8 @@ import numpy as np
 import pandas as pd
 
 from repeat_common import htmlkit as K
-from common import pipeline
-from subkhg.run import PRESET as SUBKHG_PRESET
+from repeat_prioritisation.common import pipeline
+from repeat_prioritisation.subkhg.run import PRESET as SUBKHG_PRESET
 
 CLASSES = ["Kebutuhan intervensi: tinggi", "Kebutuhan intervensi: sedang", "Kebutuhan intervensi: rendah",
            "Pengaruh pasang surut: pantau", "Dikecualikan (pengelolaan lahan)"]
@@ -219,7 +219,7 @@ def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
         "in_loc": {"title": "Peat depth and canal blocks", "body": [f"Peat depth: raster in centimetres, converted with <code>peat_depth_scale: 0.01</code>. {floor_txt + ' (a floor); ' if floor_txt else ''}{floor_units} of {peat_n} sub-KHG have a mean at the lowest value." if floor_units is not None else "Peat depth raster.",
                                                                f"Existing canal blocks: {_n(n_blk)} points (BRGM file, <code>Jenis = Sekat Kanal</code>, <code>REALISASI</code>), compared with the blocks the spacing rule asks for."]},
         "in_tma": {"title": "Water table and neraca air", "body": [f"SiTMAT concession stations{f' ({n_st} inside the KHG)' if n_st else ''}: a current-state indicator for 2026-04-01 to 2026-10-15 (the record is one season). {tma_units} of {n_units} sub-KHG contain a station." if tma_units is not None else "SiTMAT stations.",
-                                                         "The neraca air table (climatic balance per sub-KHG, repeat_neraca.balance) is merged through <code>extra_indicators</code>: <code>u_wb_mean</code> and <code>u_deficit_months</code> replace the TerraClimate columns and enter the rank-sum; in the need score they have no weight unless one is set. They are left empty where <code>balance_stable_ok</code> is 0." + (" In this run the flag is 0." if skill_ok == 0 else "")]},
+                                                         "The neraca air table (climatic balance per sub-KHG, repeat_neraca.balance) is merged through <code>extra_indicators</code>: <code>u_wb_mean</code> and <code>u_deficit_months</code> replace the TerraClimate columns; the rank-sum water slot reads <code>p_minus_et_mean_mm</code> (P - ET with KHG-mean rain); the need score gives them no weight. All are left empty where <code>balance_stable_ok</code> is 0 (the ET products disagree on the order of units, or it changes between years)." + (" In this run the flag is 0." if skill_ok == 0 else "")]},
         "in_cloud": {"title": "Cloud layers", "body": [f"Sentinel-2 L2A NDMI and NDVI (dry-season median, {res} m here), MODIS burned area, FIRMS VIIRS hotspots, ESA WorldCover, JRC surface water, TerraClimate.",
                                                         "Read per KHG window from STAC and Zarr, never downloaded whole. ERA5 rainfall is off in this run: its indicators have weight 0."]},
         "p_delin": {"title": "1 Delineate sub-KHG (repeat-delineation repo)", "body": [
@@ -228,7 +228,7 @@ def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
             f"Of {pieces} catchment pieces, those smaller than {min_area:g} km2" + (" (<code>min_area_km2: auto</code>: the smallest value that gives at most 30 units)" if auto else "") + f" are merged, smallest first, into the neighbour they share the longest divide with ({merge} merge; outlet channels only if there is no divide neighbour). Result: {n_units} sub-KHG of {g.area_km2.min():.0f} to {g.area_km2.max():.0f} km2.",
             "Command: <code>python -m repeat_delineation --config ../re-peat/sites/14.02-04-05.01_kampar_gaung/delineate.yaml</code>"]},
         "p_fetch": {"title": "2 Fetch cloud layers (common/sources.py)", "body": [f"One 30 m grid per KHG; layers are written to <code>cache/{kid}/</code> and never refetched (the cache is keyed by file name).",
-                                                                                    f"Baseline {base}. Command: <code>python -m subkhg.run --config ... --fetch-only</code>."]},
+                                                                                    f"Baseline {base}. Command: <code>repeat-subkhg --config ... --fetch-only</code>."]},
         "p_ind": {"title": "3 Indicators per sub-KHG (common/indicators.py)", "body": [
             "Urgency: NDMI, burned share, hotspots, canal density, water-table days, block gap. Stakes: peat depth, protected share, settlements. Feasibility (reported, not ranked): canal reach, distance to water, lift, access.",
             f"Each is a zonal mean or median over the sub-KHG at 30 m, averaged over {base}. Missing layers leave a column empty and the weights adapt."]},
@@ -243,7 +243,7 @@ def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
         "o_rank": {"title": "Ranked sub-KHG", "body": ["<code>unit_prioritas.gpkg</code> and <code>.csv</code>: every indicator, group scores, <code>kelas</code>, <code>peringkat</code>, <code>peringkat_need</code>, <code>peringkat_ranksum</code>, <code>rk_*</code> single ranks and the sensitivity fields."]},
         "o_sekat": {"title": "Block needs", "body": ["<code>kebutuhan_sekat.csv</code>: blocks needed, existing and additional per KHG and class (a first cost estimate)."]},
         "o_rep": {"title": "Checks and maps", "body": ["<code>laporan.json</code> (weights, thresholds, class counts, correlated pairs, sensitivity, agreement of the two methods) and one map PNG per KHG."]},
-        "o_md": {"title": "Run report", "body": ["<code>python -m subkhg.report ...</code> writes the numbers of the run to markdown; <code>python -m subkhg.dashboard ...</code> writes this page."]},
+        "o_md": {"title": "Run report", "body": ["<code>repeat-subkhg-report ...</code> writes the numbers of the run to markdown; <code>repeat-subkhg-dashboard ...</code> writes this page."]},
     }
 
     caveats = []
@@ -254,7 +254,7 @@ def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
     if forest_med is not None:
         caveats.append(("warn", f"<b>Tree cover share is high (median {forest_med:.2f})</b> because WorldCover counts plantations as tree cover, so it cannot separate natural forest from acacia."))
     if skill_ok == 0:
-        caveats.append(("bad", "<b>Neraca air balance does not rank these sub-KHG</b>: the order changes between years or between ET sources (balance_stable_ok = 0), so u_wb_mean and u_deficit_months are left empty."
+        caveats.append(("bad", "<b>Neraca air balance does not rank these sub-KHG</b>: the ET products disagree on the order of units, or it changes between years (balance_stable_ok = 0), so the balance columns are left empty."
                         if flag == "balance_stable_ok" else f"<b>Neraca air failed its skill check</b> on the {n_st} SiTMAT stations (no spatial skill), so its outputs are shown for reference only and have no weight in the need score."))
     if pairs:
         caveats.append(("warn", "<b>Overlapping indicators:</b> " + ", ".join(f"{p['a']} and {p['b']} (rho {p['spearman']})" for p in pairs) + "."))
@@ -293,7 +293,7 @@ def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
     data = {"units": units, "vars": vars_, "geo": geo, "stations": stations, "bounds": [float(b[0]), float(b[1]), float(b[2]), float(b[3])],
             "details": details, "sweep": sweep, "merge": merge, "classes": CLASSES, "n_units": n_units, "min_area": min_area,
             "agree": agree, "neraca_ok": skill_ok, "method": lap.get("method")}
-    foot = ("Generated by <code>python -m subkhg.dashboard --subkhg-config " + subkhg_config + (f" --neraca-dir {neraca_dir}" if neraca_dir else "")
+    foot = ("Generated by <code>repeat-subkhg-dashboard --subkhg-config " + subkhg_config + (f" --neraca-dir {neraca_dir}" if neraca_dir else "")
             + f"</code> on {datetime.date.today()} from the output folders of the run. Steps, settings and reasons: <code>re-peat/sites/{Path(subkhg_config).parent.name}/README.md</code>.")
     facts = [("KHG", kid), ("Sub-KHG", str(n_units)), ("Area", f"{area_tot:,.0f} km2"), ("Baseline", base), ("Method in use", str(lap.get("method"))), ("Generated", str(datetime.date.today()))]
     html_ = K.page("Sub-KHG prioritisation", "How sub-KHG are delineated and ranked by need for intervention, with the outputs of one real run on a map.", facts,

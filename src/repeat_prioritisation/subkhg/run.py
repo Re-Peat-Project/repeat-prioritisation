@@ -2,13 +2,14 @@
 """Sub-KHG prioritisation: the sub-KHG polygons of repeat-delineation (or hexagons / your polygons) inside each KHG,
 full indicator set at 30 m, ranked by need for intervention, canal-block needs.
 
-  python -m subkhg.run --config configs/local/subkhg.yaml
-  python -m subkhg.run --config configs/local/subkhg.yaml --skip-fetch     # re-score from cache
-  python -m subkhg.run --print-default-config > configs/local/subkhg.yaml
+  repeat-subkhg --config configs/local/subkhg.yaml
+  repeat-subkhg --config configs/local/subkhg.yaml --skip-fetch     # re-score from cache
+  repeat-subkhg --print-default-config > configs/local/subkhg.yaml
 """
-from common import pipeline
-from subkhg.prioritise import CLASS_COLORS, score_need
-from subkhg.priority_export import EXPORT_DEFAULTS, write_priority
+from repeat_prioritisation.common import pipeline
+from repeat_prioritisation.subkhg.national_layers import fire_and_canals
+from repeat_prioritisation.subkhg.prioritise import CLASS_COLORS, score_need
+from repeat_prioritisation.subkhg.priority_export import EXPORT_DEFAULTS, write_priority
 
 PRESET = {
     "units": {"mode": "vector"},      # path: subkhg_units.gpkg from repeat-delineation
@@ -21,5 +22,10 @@ PRESET = {
     "sources": {"era5": {"enabled": False}},
 }
 
+def main(argv=None):
+    pipeline.main("subkhg", PRESET, __doc__, argv, score=score_need, class_colors=CLASS_COLORS, after=write_priority,
+                  extra_indicators=(fire_and_canals,))      # fire and canals from the national layers, if `national_layers:` is set
+
+
 if __name__ == "__main__":
-    pipeline.main("subkhg", PRESET, __doc__, score=score_need, class_colors=CLASS_COLORS, after=write_priority)
+    main()

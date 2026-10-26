@@ -25,7 +25,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from common import scoring as SC
+from repeat_prioritisation.common import scoring as SC
 
 log = logging.getLogger("prioritas.subkhg")
 
@@ -38,6 +38,10 @@ NEED_INDICATORS = {
     "f_reach":      {"group": "u", "weight": 1.5},                    # drained by canals -> sekat kanal
     "f_water_dist": {"group": "u", "direction": 1, "weight": 1.0},    # far from dry-season water -> sumur bor
     "i_forest":     {"group": "u", "direction": -1, "weight": 1.0},   # intact forest needs less
+    # fire and canals from the national layers (subkhg.national_layers), weights as in the national profile (provisional)
+    "u_burn_repeat": {"weight": 1.0},
+    "u_hotspot_now": {"weight": 1.0},
+    "u_canal_primary": {"weight": 0.5}, "u_canal_secondary": {"weight": 0.3}, "u_canal_tertiary": {"weight": 0.2},
     # Climate layers are 4-25 km, so they are constant inside a KHG. Within a KHG they only vary through the
     # interpolation between cells or, for the water balance, through forest interception (forest then looks
     # drier, which cancels i_forest). Off until the neraca air module gives a sub-KHG water balance.
@@ -121,7 +125,11 @@ def ranksum(df: pd.DataFrame, sc: dict) -> tuple[pd.DataFrame, dict]:
 
 
 def score_need(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
+    user_canal = "u_canal_density" in (cfg.get("indicators") or {})
     cfg = _need_cfg(cfg)
+    # canals by class (national layers) replace the single density, so the canals are not counted twice
+    if not user_canal and any(c in df and df[c].notna().any() for c in ("u_canal_primary", "u_canal_secondary", "u_canal_tertiary")):
+        cfg["indicators"]["u_canal_density"] = {"weight": 0.0}
     sc = cfg["scoring"]
     method = sc.get("method") or "need"
     if method not in ("need", "ranksum"):

@@ -3,8 +3,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from national import dashboard as D
-from national import profile as P
+from repeat_prioritisation.national import dashboard as D
+from repeat_prioritisation.national import profile as P
 
 
 def test_params_are_scored_indicators():

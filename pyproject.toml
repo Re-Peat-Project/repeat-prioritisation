@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repeat-prioritisation"
+version = "0.1.0"
+description = "RE-PEAT prioritisation: national KHG profile and ranking, sub-KHG ranking inside a KHG, shared indicator and scoring engine"
+requires-python = ">=3.11"
+dependencies = [
+    "repeat-common",                                    # install from ../repeat-common first (not on PyPI)
+    "numpy>=1.24", "pandas>=2.0", "scipy>=1.10", "rasterio>=1.3", "geopandas>=0.14", "shapely>=2.0", "pyproj>=3.5",
+    "pyyaml>=6.0", "matplotlib>=3.7", "pyogrio>=0.7",
+    # cloud-native access to Sentinel-2, WorldCover and JRC water (Planetary Computer)
+    "pystac-client>=0.7", "planetary-computer>=1.0", "odc-stac>=0.3.9", "xarray>=2024.1", "dask>=2024.1",
+    "zarr>=2.16", "adlfs>=2024.1", "fsspec>=2024.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+repeat-subkhg = "repeat_prioritisation.subkhg.run:main"                    # sub-KHG ranking of one KHG
+repeat-subkhg-prepare = "repeat_prioritisation.subkhg.prepare_inputs:main"  # clip the national vectors to a KHG
+repeat-subkhg-check = "repeat_prioritisation.subkhg.check_inputs:main"      # look at the inputs of a run
+repeat-subkhg-report = "repeat_prioritisation.subkhg.report:main"           # markdown report of a run
+repeat-subkhg-dashboard = "repeat_prioritisation.subkhg.dashboard:main"     # map page of a run
+repeat-national-profile = "repeat_prioritisation.national.profile:main"     # profile and ranking of all 865 KHG
+repeat-national-run = "repeat_prioritisation.national.run:main"             # engine run on shortlisted KHG (stage 3 layers)
+repeat-national-stage3 = "repeat_prioritisation.national.stage3:main"
+repeat-national-overlay = "repeat_prioritisation.national.overlay:main"
+repeat-national-dashboard = "repeat_prioritisation.national.dashboard:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"repeat_prioritisation.national" = ["assets/*"]
+"repeat_prioritisation.investigations" = ["assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -5,9 +5,9 @@
 import numpy as np
 import pandas as pd
 
-from common import pipeline
-from subkhg.prioritise import ranksum, score_need
-from subkhg.run import PRESET
+from repeat_prioritisation.common import pipeline
+from repeat_prioritisation.subkhg.prioritise import ranksum, score_need
+from repeat_prioritisation.subkhg.run import PRESET
 
 
 def _six():

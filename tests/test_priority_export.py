@@ -5,7 +5,7 @@
 import numpy as np
 import pandas as pd
 
-from subkhg.priority_export import priority_table
+from repeat_prioritisation.subkhg.priority_export import priority_table
 
 
 def _ranked():

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Interactive dashboard of the national KHG ranking: one self-contained HTML file.
 
-  python -m national.dashboard --config configs/examples/national_profile.yaml [--top 25] [--out file.html] [--reassemble]
+  repeat-national-dashboard --config configs/examples/national_profile.yaml [--top 25] [--out file.html] [--reassemble]
 
-Reads what `python -m national.profile --mode operational` wrote, the Stage 3 tables
-(`python -m national.stage3 summarize`) and the input layers named in the config, for the maps of the KHG that get a detailed
+Reads what `repeat-national-profile --mode operational` wrote, the Stage 3 tables
+(`repeat-national-stage3 summarize`) and the input layers named in the config, for the maps of the KHG that get a detailed
 profile: the top N by the default weights plus the team's selected KHG. The weights are applied in the browser, with the same
 scaling as common.scoring (5th to 95th percentile of the KHG that pass the filters), so moving a slider re-ranks live.
 Template, scripts and the English to Indonesian dictionary (i18n_id.js): national/assets/. D3 (ISC) and MapLibre GL JS (BSD) are vendored there. The basemap is OpenFreeMap (Positron style, OpenMapTiles data, OpenStreetMap contributors): it loads from the internet, the rest works offline.
@@ -24,10 +24,10 @@ import pyogrio
 import shapely
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from national import profile as P
-from national import overlay as O  # noqa: E402
+ROOT = Path(__file__).resolve().parents[1]          # the package folder
+WORKSPACE = Path(__file__).resolve().parents[4]     # _repeat-project, when run from the source tree; else set REPEAT_HUB
+from repeat_prioritisation.national import profile as P
+from repeat_prioritisation.national import overlay as O  # noqa: E402
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 
@@ -141,7 +141,7 @@ def build(cfg, top_n, out_path):
 
     # which KHG are the team's
     team = {}
-    sel_path = Path(P.os.environ.get("REPEAT_HUB", ROOT.parent / "re-peat")) / "sites" / "selected_khg.csv"
+    sel_path = Path(P.os.environ.get("REPEAT_HUB", WORKSPACE / "re-peat")) / "sites" / "selected_khg.csv"
     if sel_path.exists():
         names = {P.norm_name(n): (role, given) for n, role, given in
                  pd.read_csv(sel_path).fillna("")[["khg_name_in_gpkg", "role", "name_as_given"]].itertuples(index=False) if n}

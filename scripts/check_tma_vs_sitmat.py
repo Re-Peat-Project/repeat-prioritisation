@@ -15,11 +15,9 @@ import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import pandas as pd
 
-from common import pipeline
+from repeat_prioritisation.common import pipeline
 from repeat_common import tma as TMA
 
 

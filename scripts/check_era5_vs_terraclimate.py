@@ -15,14 +15,12 @@ import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import geopandas as gpd
 import numpy as np
 import rasterio
 
 from repeat_common import grid as G
-from common import pipeline
+from repeat_prioritisation.common import pipeline
 from repeat_common import sources as SRC
 
 

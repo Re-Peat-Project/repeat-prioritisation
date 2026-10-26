@@ -1,7 +1,7 @@
 # Stage 3: the cloud-data layers (climate, land cover, surface water, optionally NDMI) for the shortlisted KHG, using the
-# national engine on the top-N boundaries written by `python -m national.stage3 select`.
-#   python -m national.run --config configs/examples/national_stage3.yaml --fetch-only   # fetch the layers
-#   python -m national.stage3 summarize --config configs/examples/national_stage3.yaml
+# national engine on the top-N boundaries written by `repeat-national-stage3 select`.
+#   repeat-national-run --config configs/examples/national_stage3.yaml --fetch-only   # fetch the layers
+#   repeat-national-stage3 summarize --config configs/examples/national_stage3.yaml
 # Environment: REPEAT_DATA, REPEAT_WORK (= re-peat/reports), SITMAT_PROCESSED.
 khg: ${REPEAT_WORK}/national_profile/stage3/top25_khg.gpkg
 khg_id_field: khg_id

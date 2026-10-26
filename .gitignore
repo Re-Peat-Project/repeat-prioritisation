@@ -30,3 +30,5 @@ Thumbs.db
 
 # local inputs prepared from your own data (clipped copies)
 data_local/
+build/
+*.egg-info/

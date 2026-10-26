@@ -1,5 +1,5 @@
 # Sub-KHG scoring on a small Riau KHG (72), hexagon units, from a prefetched 2021 cache in tests/fixtures/prefetched/72.
-#   python -m subkhg.run --config configs/smoke/subkhg.yaml --skip-fetch
+#   repeat-subkhg --config configs/smoke/subkhg.yaml --skip-fetch
 # Without --skip-fetch it fetches the 2021 layers first (about 1 minute; ERA5 rainfall is off for sub-KHG runs).
 khg: tests/fixtures/khg_small.gpkg
 khg_id_field: khg_id

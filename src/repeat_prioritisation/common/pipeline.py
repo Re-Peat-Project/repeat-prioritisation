@@ -110,12 +110,12 @@ def merge_indicators(df: pd.DataFrame, table: pd.DataFrame, source: str = "extra
     return out
 
 
-BALANCE_COLUMNS = ("u_wb_mean", "u_deficit_months")
+BALANCE_COLUMNS = ("u_wb_mean", "u_deficit_months", "p_minus_et_mean_mm")
 
 
 def gate_balance(df: pd.DataFrame) -> pd.DataFrame:
     """Blank the neraca air balance columns of units whose table says the order of sub-KHG is not stable
-    (balance_stable_ok = 0: the order changes between years or between ET sources, repeat_neraca.balance).
+    (balance_stable_ok = 0: the ET products disagree on the order of units, or the order changes between years; repeat_neraca.balance).
     Units with the flag empty (KHG-level runs) or 1 keep their values."""
     if "balance_stable_ok" not in df:
         return df

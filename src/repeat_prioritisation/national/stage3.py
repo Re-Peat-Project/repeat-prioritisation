@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stage 3 of the national profile: the cloud-data layers for the shortlisted KHG.
 
-  python -m national.stage3 select    --config CFG [--top 25]   # top-N boundaries from the operational ranking
-  python -m national.run              --config CFG --fetch-only # engine: TerraClimate deficit and rain, WorldCover, JRC water
-  python -m national.stage3 summarize --config CFG              # stage3_profile.csv and stage3_yearly.csv
+  repeat-national-stage3 select    --config CFG [--top 25]   # top-N boundaries from the operational ranking
+  repeat-national-run              --config CFG --fetch-only # engine: TerraClimate deficit and rain, WorldCover, JRC water
+  repeat-national-stage3 summarize --config CFG              # stage3_profile.csv and stage3_yearly.csv
 
 CFG is configs/examples/national_stage3.yaml (the engine's config plus the keys below). Dry spells from ERA5 are not used:
 the hourly store is slow to read and 25 km is too coarse to tell neighbouring KHG apart.
@@ -29,10 +29,7 @@ import shapely.ops
 import yaml
 from rasterio.features import geometry_mask
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT.parent / "repeat-common" / "src"))
-from national import profile as P  # noqa: E402
+from repeat_prioritisation.national import profile as P  # noqa: E402
 
 log = logging.getLogger("prioritas.stage3")
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """National KHG prioritisation: one unit per KHG, coarse wall-to-wall layers (250 m grid).
 
-  python -m national.run --config configs/local/national.yaml
-  python -m national.run --print-default-config > configs/local/national.yaml
+  repeat-national-run --config configs/local/national.yaml
+  repeat-national-run --print-default-config > configs/local/national.yaml
 """
-from common import pipeline
+from repeat_prioritisation.common import pipeline
 
 PRESET = {
     "units": {"mode": "khg"},
@@ -16,5 +16,9 @@ PRESET = {
     "scoring": {"national": True, "sensitivity_runs": 0, "normalise_scope": "all"},
 }
 
+def main(argv=None):
+    pipeline.main("khg", PRESET, __doc__, argv)
+
+
 if __name__ == "__main__":
-    pipeline.main("khg", PRESET, __doc__)
+    main()

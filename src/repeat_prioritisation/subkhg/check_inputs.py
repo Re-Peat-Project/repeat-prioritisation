@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Look at the inputs of a run before running it, and write what was found as markdown.
 
-  python -m subkhg.check_inputs --config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml [--out ../re-peat/sites/14.02-04-05.01_kampar_gaung/reports/kampar_gaung_inputs.md]
+  repeat-subkhg-check --config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml [--out ../re-peat/sites/14.02-04-05.01_kampar_gaung/reports/kampar_gaung_inputs.md]
 
 For the KHG, rasters (peat depth, DTM), vectors (canals, rivers, lakes, blocks) and the water-table stations it reports
 the facts that decided settings in the Kampar - Gaung run: canal classes (for outlet_canal_classes), whether the peat
@@ -15,8 +15,8 @@ import logging
 import numpy as np
 
 from repeat_common import grid as G
-from common import pipeline
-from subkhg.run import PRESET
+from repeat_prioritisation.common import pipeline
+from repeat_prioritisation.subkhg.run import PRESET
 
 log = logging.getLogger("prioritas.check")
 

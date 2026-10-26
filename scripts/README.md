@@ -12,9 +12,9 @@ repeat them. Run them from the repo root with the project environment (`PYTHONPA
 | `forcing_test.sh <khg>` (moved to repeat-neraca, retired with the bucket experiments 2026-10-26) | Does finer rain (CHIRPS v3, 5 km) or evaporation (WaPOR v3, 300 m) than ERA5 improve the neraca air calibration? Then `python -m repeat_neraca.bucket.forcing_compare` tabulates the runs | `repeat-neraca/docs/bucket_reports/<khg>_forcing_test.md`, `repeat_neraca.bucket/README.md` |
 | `index_repeat_data.py` | Which DTM and peat depth rasters cover which KHG boundary? | `re-peat/sites/14.02-04-05.01_kampar_gaung/README.md`, step 0 (`re-peat/sites/repeat_data_index.csv`) |
 
-The checks that belong to a particular run are commands of the packages, not scripts: `python -m subkhg.check_inputs`
+The checks that belong to a particular run are commands of the packages, not scripts: `repeat-subkhg-check`
 (the inputs of a run), `python -m repeat_neraca.stations` (repeat-neraca) (the station files for the neraca air deficit; the bucket experiments `export_inputs`, `covariates`, `sentinel1` and `radar_temporal` were retired 2026-10-26, their reports are in `repeat-neraca/docs/bucket_reports/`) and
-`python -m subkhg.report` (the report of a run). The tests that need no data are in `tests/`.
+`repeat-subkhg-report` (the report of a run). The tests that need no data are in `tests/`.
 
 Two notes for anyone extending this:
 

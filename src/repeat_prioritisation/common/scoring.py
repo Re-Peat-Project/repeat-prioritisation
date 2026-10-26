@@ -22,6 +22,12 @@ INDICATOR_DEFAULTS = {
     "u_spell14":        {"group": "u", "weight": 0.5, "direction": 1, "label": "Jumlah periode kering >= 14 hari"},
     "u_fire_freq":      {"group": "u", "weight": 2.0, "direction": 1, "label": "Frekuensi terbakar"},
     "u_hotspot":        {"group": "u", "weight": 1.0, "direction": 1, "label": "Kepadatan titik api"},
+    # from the national layers (national.profile; sub-KHG through subkhg.national_layers); weight 0 here, set per program
+    "u_burn_repeat":    {"group": "u", "weight": 0.0, "direction": 1, "label": "Porsi terbakar dua kali atau lebih"},
+    "u_hotspot_now":    {"group": "u", "weight": 0.0, "direction": 1, "label": "Kepadatan titik api tahun ini"},
+    "u_canal_primary":  {"group": "u", "weight": 0.0, "direction": 1, "label": "Kerapatan kanal primer"},
+    "u_canal_secondary": {"group": "u", "weight": 0.0, "direction": 1, "label": "Kerapatan kanal sekunder"},
+    "u_canal_tertiary": {"group": "u", "weight": 0.0, "direction": 1, "label": "Kerapatan kanal tersier"},
     "u_canal_density":  {"group": "u", "weight": 1.0, "direction": 1, "label": "Kerapatan kanal"},
     "u_tma":            {"group": "u", "weight": 1.0, "direction": 1, "label": "Hari TMA > 0,4 m"},
     "u_tma_recession":  {"group": "u", "weight": 1.0, "direction": 1, "label": "Laju penurunan TMA hari kering"},

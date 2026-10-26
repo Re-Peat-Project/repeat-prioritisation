@@ -1,4 +1,4 @@
-# National KHG profile and ranking from local layers: python -m national.profile --config configs/examples/national_profile.yaml
+# National KHG profile and ranking from local layers: repeat-national-profile --config configs/examples/national_profile.yaml
 # Environment: REPEAT_DATA (the _data folder), REPEAT_WORK (outputs), REPEAT_HUB (the re-peat repository),
 # SITMAT_PROCESSED (repeat-sitmat/sitmat_out/processed). Weights are provisional: agree them with the team.
 data: ${REPEAT_DATA}

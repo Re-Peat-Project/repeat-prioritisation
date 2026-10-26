@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fire near an airport and the KHG around it: one self-contained HTML report.
 
-  python -m investigations.airport --config configs/investigations/banjarbaru.yaml
+  python -m repeat_prioritisation.investigations.airport --config configs/investigations/banjarbaru.yaml
 
 Puts the runway against the KHG boundary (KLHK FEG 1:50,000 layer, which carries KHG set after SK.129/2017), the peat under it
 (FEG peat soil, the GFW composite extent and the 1 km Global Peatland Map), the fire record (FIRMS VIIRS 2012 to 2025, KLH 2026
@@ -31,8 +31,7 @@ from rasterio.mask import mask as rmask
 from rasterio.warp import Resampling, calculate_default_transform, reproject
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from national import profile as P  # noqa: E402
+from repeat_prioritisation.national import profile as P  # noqa: E402
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 NAT = ROOT / "national" / "assets"

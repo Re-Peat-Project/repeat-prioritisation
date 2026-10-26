@@ -16,23 +16,23 @@ subkhg/
 ## Run
 
 ```bash
-python -m subkhg.run --print-default-config > configs/local/subkhg.yaml     # edit paths
-python -m subkhg.run --config configs/local/subkhg.yaml                     # fetch, delineate, score
-python -m subkhg.run --config configs/local/subkhg.yaml --fetch-only        # just build the cache
-python -m subkhg.run --config configs/local/subkhg.yaml --skip-fetch        # re-score (e.g. new weights)
+repeat-subkhg --print-default-config > configs/local/subkhg.yaml     # edit paths
+repeat-subkhg --config configs/local/subkhg.yaml                     # fetch, delineate, score
+repeat-subkhg --config configs/local/subkhg.yaml --fetch-only        # just build the cache
+repeat-subkhg --config configs/local/subkhg.yaml --skip-fetch        # re-score (e.g. new weights)
 ```
 
 For a real KHG, first cut the national vector files down to that KHG (runs otherwise re-read hundreds of MB each time), keeping only the features you need:
 
 ```bash
-python -m subkhg.prepare_inputs --khg-shp <KHG shapefile> --khg-id 71 --out $REPEAT_KHG/14.02-04-05.01_kampar_gaung/00_inputs \
+repeat-subkhg-prepare --khg-shp <KHG shapefile> --khg-id 71 --out $REPEAT_KHG/14.02-04-05.01_kampar_gaung/00_inputs \
     --canals kanal.gpkg --rivers sungai.gpkg --blocks infrastruktur.gpkg \
     --blocks-where "Jenis == 'Sekat Kanal' and KETERANGAN == 'REALISASI'"
 ```
 
 Canal classes matter: if every canal is an outlet, a dense plantation network breaks the KHG into tiny pieces. Set `units.subkhg.canal_class_field` and `outlet_canal_classes` (compared in lower case, so `["Kanal Primer"]` for the BRGM canal file), and `params.ipg_canal_class_field` and `ipg_canal_classes` for the canal-block counts.
 
-Check the inputs before running (`python -m subkhg.check_inputs --config ... --out ../re-peat/sites/<khg>/reports/<run>_inputs.md`): it lists the canal classes, whether the peat depth raster has a floor value, and how many water-table stations lie inside the KHG. After a run, `python -m subkhg.report --subkhg-config ... --neraca-config ... --out docs/reports/<run>.md` writes the numbers of the run. A worked example is `docs/runbook_kampar_gaung.md`.
+Check the inputs before running (`repeat-subkhg-check --config ... --out ../re-peat/sites/<khg>/reports/<run>_inputs.md`): it lists the canal classes, whether the peat depth raster has a floor value, and how many water-table stations lie inside the KHG. After a run, `repeat-subkhg-report --subkhg-config ... --neraca-config ... --out docs/reports/<run>.md` writes the numbers of the run. A worked example is `docs/runbook_kampar_gaung.md`.
 
 Delineation is its own repository, `repeat-delineation` (`python -m repeat_delineation --config ...`). It writes `subkhg_units.gpkg`; score those polygons with `units: {mode: vector, path: <its out>/subkhg_units.gpkg}` in the config of `subkhg.run`. Edit the polygons first if needed; `khg_id` and `unit_id` are kept. The old `units.mode: subkhg` (delineating inside this program) was removed.
 

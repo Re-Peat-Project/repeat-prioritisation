@@ -3,7 +3,7 @@
 and the Bluebook target villages (with the DPG villages of the BRG atlas among them), crossed with peat, burned area and
 this year's hotspots.
 
-  python -m national.overlay --config configs/examples/national_stage3.yaml
+  repeat-national-overlay --config configs/examples/national_stage3.yaml
 
 Reads the KHG written by `national.stage3 select` and writes, in <stage3>/overlay/:
   overlay_summary.csv   one row per KHG, layer and class: area, share of KHG and of peat, burned share, hotspots
@@ -36,11 +36,8 @@ import shapely
 import shapely.ops
 from pyproj import Transformer
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT.parent / "repeat-common" / "src"))
-from national import profile as P  # noqa: E402
-from national import stage3 as S3  # noqa: E402
+from repeat_prioritisation.national import profile as P  # noqa: E402
+from repeat_prioritisation.national import stage3 as S3  # noqa: E402
 
 log = logging.getLogger("prioritas.overlay")
 

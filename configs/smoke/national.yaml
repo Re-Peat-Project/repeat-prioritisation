@@ -1,5 +1,5 @@
 # National ranking of three small KHG, 2021 only. Fetches its layers (about 3 minutes); rainfall is off to keep it fast.
-#   python -m national.run --config configs/smoke/national.yaml
+#   repeat-national-run --config configs/smoke/national.yaml
 khg: tests/fixtures/khg_small.gpkg
 khg_id_field: khg_id
 years: {baseline: [2021, 2021], validation: [], elnino: []}
