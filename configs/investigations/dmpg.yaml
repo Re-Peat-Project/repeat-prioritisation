@@ -1,0 +1,32 @@
+# Do Desa Peduli Gambut villages burn less? Question from the World Bank (2026-10); KLH stated in a meeting that 99% of
+# DMPG villages had no fire.
+#   python -m investigations.dmpg --config configs/investigations/dmpg.yaml
+# Inputs: python -m repeat_common.fetch_dpg_atlas (atlas villages matched to the target villages), fetch_peat_extent.
+# Environment: REPEAT_DATA, REPEAT_WORK, REPEAT_HUB.
+data: ${REPEAT_DATA}
+out: ${REPEAT_WORK}/investigations/dmpg
+registry: ${REPEAT_HUB}/sites/khg_registry.csv
+inputs:
+  khg: batas_khg_indonesia.gpkg
+  villages: desa_target_pemulihan_ekosistem_gambut.gpkg   # 2,004 Bluebook 2026 target villages: the DPG villages and their controls
+  dpg: dpg/dpg_atlas_villages.csv                          # BRG atlas DPG villages, target_objectid = matched polygon
+  burned: burnt_area_2015_2026_Indonesia.gpkg
+  hotspots: hotspot_viirs_snpp_2012_2025.gpkg
+  hotspots_now: _data_hotspot_Januari_September_2026.gpkg
+  licences: landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg
+peat_extent: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif
+hotspots: {confidence: [n, h], types: [0]}   # FIRMS VIIRS, as in the national profile
+now: {levels: [medium, high]}                # KLH 2026 hotspots, as in the national profile
+post_from: 2019          # atlas mapping ran June 2018 to July 2019; 2019 is the first full year after it
+mapped: [2018.4, 2019.6] # shaded on the rate-ratio chart
+periods:                 # years of each period; years outside a dataset are dropped, an empty period is skipped
+  pre_early: [2012, 2013, 2014]
+  pre_2015: [2015]                            # extreme fire year, possibly the year the villages were picked for
+  dry_pre: [2014, 2015]
+  post: [2019, 2020, 2021, 2022, 2023, 2024, 2025]
+  dry_post: [2019, 2023]                      # the dry years after the mapping
+contrasts: [[post, pre_early], [post, pre_2015], [dry_post, dry_pre]]
+bootstrap: 1000
+seed: 1
+min_peat_km2: 0.5        # villages with less peat are left out of the rates
+ring_km: 5               # licence ring covariate, as in national.overlay

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DPG villages and fire</title>
+<style>/*MLCSS*/</style>
+<style>
+:root{color-scheme:light;
+  --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#6f6e69;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);
+  --dpg:#eb6834;--ctl:#2a78d6;--wash:rgba(42,120,214,.08);--shadow:0 4px 18px rgba(0,0,0,.14);--ramp0:#fde3d6;--ramp1:#9a3412;--nodata:#d9d8d2}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#9a9993;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
+  --dpg:#d95926;--ctl:#3987e5;--wash:rgba(57,135,229,.14);--shadow:0 4px 18px rgba(0,0,0,.5);--ramp0:#5c2410;--ramp1:#f8b896;--nodata:#3a3a37}}
+:root[data-theme=dark]{color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#9a9993;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
+  --dpg:#d95926;--ctl:#3987e5;--wash:rgba(57,135,229,.14);--shadow:0 4px 18px rgba(0,0,0,.5);--ramp0:#5c2410;--ramp1:#f8b896;--nodata:#3a3a37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header,main{max-width:1320px;margin:0 auto;padding:0 20px}
+header{padding-top:18px;padding-bottom:10px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 24px;border-bottom:1px solid var(--border)}
+h1{font-size:21px;margin:0;font-weight:650}
+h2{font-size:15px;margin:0 0 2px;font-weight:600}
+h3{font-size:12.5px;margin:0 0 4px;font-weight:600}
+.sub{margin:3px 0 0;color:var(--ink2);font-size:13px}
+.tools{margin-left:auto}
+button{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
+section{margin:20px 0}
+.lead{color:var(--ink2);font-size:13px;margin:0 0 10px;max-width:880px}
+.grid{display:grid;gap:14px}
+.verdicts{grid-template-columns:repeat(4,minmax(0,1fr))}
+.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;min-width:0}
+.verdict .t{font-size:15px;font-weight:650;margin-bottom:6px}
+.verdict .v{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.1;margin-bottom:6px}
+.verdict .v small{font-size:13px;font-weight:400;color:var(--ink2);margin-left:4px}
+.verdict .x{font-size:13px;color:var(--ink2)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:var(--ink2);margin:0 0 6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:16px;height:0;border-top:2px solid}
+svg{width:100%;display:block;overflow:visible}
+.axis text{fill:var(--muted);font-size:11px}
+.axis path,.axis line{stroke:var(--axis)}
+.gridl line{stroke:var(--grid)}.gridl path{display:none}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+th{color:var(--muted);font-weight:600;cursor:pointer;background:var(--surface)}
+tbody tr:hover{background:var(--wash)}
+.tablewrap{overflow:auto}
+#map{height:560px;border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:0 0 8px}
+.seg button{border:0;border-radius:0}.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--ink2);margin:6px 0 0;align-items:center}
+.keys span{display:inline-flex;align-items:center;gap:5px}
+.keys b{display:inline-block;width:14px;height:10px;border-radius:2px}
+ul.notes{margin:0;padding-left:18px;color:var(--ink2);font-size:13px}
+ul.notes li{margin:3px 0}
+#tip{position:fixed;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:var(--shadow);display:none;z-index:10;max-width:320px}
+#tip span{color:var(--ink2)}
+@media (max-width:1100px){.verdicts{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:1fr}}
+@media (max-width:700px){.verdicts,.two{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header>
+  <div><h1>Do Desa Peduli Gambut villages burn less?</h1>
+    <p class="sub" id="sub"></p></div>
+  <div class="tools"><button type="button" id="theme" aria-label="Switch light or dark">◐</button></div>
+</header>
+<main>
+  <section><h2>Verdict</h2><div class="grid verdicts" id="verdicts"></div></section>
+
+  <section><h2>Where the DPG villages are</h2>
+    <p class="lead">The 2,004 Bluebook target villages; dashed outlines: the KHG that hold DPG villages. Hover a village for its fire record.</p>
+    <div class="card"><div class="seg" id="mapmode"></div><div id="map"></div><div class="keys" id="mapkeys"></div></div></section>
+
+  <section><h2>1. The 99% figure</h2>
+    <p class="lead" id="lead1"></p>
+    <div class="legend" id="leg1"></div>
+    <div class="grid three" id="nofire"></div></section>
+
+  <section><h2>2. Fire in DPG villages and in other target villages</h2>
+    <p class="lead">Hotspots and burned area per km2 of peat, pooled over the villages of each group, in the KHG that hold both. Fire comes in dry years (2014, 2015, 2019, 2023).</p>
+    <div class="legend" id="leg2"></div>
+    <div class="grid two" id="rates"></div></section>
+
+  <section><h2>3. How many times more fire, year by year</h2>
+    <p class="lead" id="lead3"></p>
+    <div class="grid two" id="ratios"></div></section>
+
+  <section><h2>4. Did the gap shrink after the mapping?</h2>
+    <p class="lead" id="lead4"></p>
+    <div class="card"><div id="forest"></div></div></section>
+
+  <section><h2>All rate ratios</h2>
+    <div class="card"><div class="tablewrap" id="table"></div></div></section>
+
+  <section><h2>Method, limits, data</h2>
+    <div class="grid two"><div class="card"><h3>Method</h3><ul class="notes" id="method"></ul></div>
+      <div class="card"><h3>Limits</h3><ul class="notes" id="limits"></ul></div></div>
+    <div class="card" style="margin-top:14px"><h3>Data</h3><ul class="notes" id="data"></ul></div></section>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>/*D3*/</script>
+<script>/*ML*/</script>
+<script>/*DATA*/</script>
+<script>/*JS*/</script>
+</body>
+</html>

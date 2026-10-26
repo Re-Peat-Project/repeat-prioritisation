@@ -221,7 +221,8 @@ def build(cfg, top_n, out_path):
                 summ[layer] = [[r["class"], rd(r.area_km2), rd(r.peat_km2), rd(r.burned_peat_km2), int(r.hs_now_peat)]
                                + ([rd(r.lindung_km2), rd(r.forest_protected_km2)] if layer.startswith("licence_") else [])
                                for _, r in g_.iterrows()]
-            act = [[r.company, r.type, rd(r.area_km2), rd(r.burned_peat_km2), int(r.hs_now_peat), rd(r.lindung_km2)]
+            act = [[r.company, r.type, rd(r.area_km2), rd(r.burned_peat_km2), int(r.hs_now_peat), rd(r.lindung_km2),
+                    rd(getattr(r, "ring_burned_peat_km2", None)), int(getattr(r, "ring_hs_now_peat", 0) or 0)]
                    for r in ova[ova.khg_id == k].itertuples()]
             pr["ov"] = {"cell": cell, "s": summ, "a": act}
 

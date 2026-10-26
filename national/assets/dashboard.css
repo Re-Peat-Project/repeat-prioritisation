@@ -156,6 +156,7 @@ tbody tr:hover,tbody tr.sel{background:var(--wash)}
 .ovact{margin-top:12px}
 .ovact table{font-size:12px}
 .ovact td,.ovact th{padding:2px 8px}
+.ovact th{white-space:normal;vertical-align:bottom;line-height:1.25}
 #p-ov-leg{margin:6px 0 0;min-height:0}
 #p-ov-leg:empty{display:none}
 .ovact th:nth-child(-n+2),.ovact td:nth-child(-n+2){text-align:left}

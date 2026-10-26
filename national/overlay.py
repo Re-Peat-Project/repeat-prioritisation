@@ -14,6 +14,11 @@ Areas come from a regular grid of points inside the KHG (cell size chosen from t
 peat flag, class in every layer, burned flag and licences. A point can sit in several licences, so licence areas
 overlap and are never summed; "any licence" counts each point once. Counts of hotspots by class add back to the number
 of this year's hotspots inside the KHG. The figures say where hotspots and burns fall, not who caused them.
+5 km ring (overlay.ring_km): land within ring_km of any licence but inside none, the zone the Bluebook 2026 canal-block
+data calls "Buffer 5 Kilometer". Licences are read out to ring_km beyond the KHG so that a licence next door still draws its
+ring; only the part of a ring inside the KHG is counted. Per holder, the ring is the land within ring_km of its licences that
+lies in no licence; rings of neighbouring holders overlap and are never summed. Distances are measured in the Albers
+equal-area projection of profile.AEA (scale error within about 1 % over Indonesia).
 """
 from __future__ import annotations
 
@@ -55,7 +60,10 @@ LIC_LABEL = {"sawit": "Oil palm", "pbph": "Forest concession (PBPH)", "pphkm": "
              "pphtr": "Plantation forest (PPHTR)", "tambang": "Mining"}
 CODE_TO_KWS = {c: k for k, cs in KWS_CLASS.items() for c in cs}
 
-DEFAULT = {"overlay": {"top_actors": 8, "company_names": True, "max_licence_polygons": 120},
+RING_ORDER = ["lic", "ring", "out"]
+RING_LABEL = {"lic": "In a licence", "ring": "Within 5 km of a licence", "out": "Farther from licences"}
+
+DEFAULT = {"overlay": {"top_actors": 8, "company_names": True, "max_licence_polygons": 120, "ring_km": 5},
            "inputs": {"forest_area": "landstatus/KWSHUTAN_AR_250K_2023_Transcripted.gpkg",
                       "peat_function": "landstatus/FEG__Indonesia__2017__Rev_Tipologi.gpkg",
                       "licences": "landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg"}}
@@ -128,6 +136,30 @@ def grid(g_ll, cell=None):
     return np.asarray(lon), np.asarray(lat), (cell / 1000.0) ** 2, cell
 
 
+def to_aea(geoms):
+    tf = Transformer.from_crs(4326, P.AEA, always_xy=True)
+    return shapely.transform(geoms, lambda c: np.column_stack(tf.transform(c[:, 0], c[:, 1])))
+
+
+def from_aea(geoms):
+    inv = Transformer.from_crs(P.AEA, 4326, always_xy=True)
+    return shapely.transform(geoms, lambda c: np.column_stack(inv.transform(c[:, 0], c[:, 1])))
+
+
+def near_licences(lon, lat, lic_m, dist_m):
+    """Points (lon, lat) against licence polygons in AEA metres: a mask of points inside any licence, and the
+    (point, licence) index pairs closer than dist_m. Shared with investigations.dmpg."""
+    tf = Transformer.from_crs(4326, P.AEA, always_xy=True)
+    x, y = tf.transform(np.asarray(lon, float), np.asarray(lat, float))
+    inside = np.zeros(len(x), bool)
+    if not len(x) or not len(lic_m):
+        return inside, np.zeros(0, int), np.zeros(0, int)
+    tree, pts = shapely.STRtree(lic_m), shapely.points(x, y)
+    inside[tree.query(pts, predicate="intersects")[0]] = True
+    pi, li = tree.query(pts, predicate="dwithin", distance=dist_m)
+    return inside, pi, li
+
+
 def _read(path, g, cols):
     d = pyogrio.read_dataframe(path, mask=g, columns=cols)
     d = d[d.geometry.notna() & ~d.geometry.is_empty].copy()
@@ -194,8 +226,11 @@ def one(cfg, kid, name, g):
     kws["cls"] = kws["Fungsi"].map(CODE_TO_KWS).fillna("other")
     feg = _read(data / inp["peat_function"], g, ["FEG_KGHLTR"])
     feg["cls"] = np.where(feg["FEG_KGHLTR"].str.contains("Lindung", na=False), "lindung", "budidaya")
-    lic = _read(data / inp["licences"], g, ["PERUSAHAAN", "IZIN_USAHA", "KEG_USAHA"])
+    ring_m = 1000.0 * oc["ring_km"]
+    g_ring = from_aea(to_aea(g).buffer(ring_m))     # licences next door draw a ring into the KHG
+    lic = _read(data / inp["licences"], g_ring, ["PERUSAHAAN", "IZIN_USAHA", "KEG_USAHA"])
     lic["cls"] = lic["IZIN_USAHA"].map(LIC_VALUE)
+    lic_m = to_aea(lic.geometry.values) if len(lic) else np.array([])
     vil = _read(data / inp["villages"], g, ["OBJECTID", "DESA_2023", "KEC_2023", "KABKO_2023"])
     vil["dmpg"] = vil["OBJECTID"].isin(P.dmpg_ids(data / inp["dmpg"])) if inp.get("dmpg") else False
 
@@ -228,6 +263,19 @@ def one(cfg, kid, name, g):
         rows += r if r else [{"layer": "licence_" + key, "class": "in", "label": LIC_LABEL.get(key, "Any licence"), "area_km2": 0.0, "share_khg": 0.0,
                               "peat_km2": 0.0, "share_peat": 0.0, "burned_peat_km2": 0.0, "burned_share": np.nan, "hs_now": 0, "hs_now_peat": 0,
                               "lindung_km2": 0.0, "forest_protected_km2": 0.0}]
+    # 5 km ring: in a licence / within ring_km of one / farther (classes add up)
+    none = (np.zeros(0, bool), np.zeros(0, int), np.zeros(0, int))
+    pin, ppi, pli = near_licences(lon, lat, lic_m, ring_m)
+    hin, hpi, hli = near_licences(hs.geometry.x, hs.geometry.y, lic_m, ring_m) if len(hs) else none
+    ring_cls = lambda n, inside, pi: np.where(inside, "lic", np.where(np.isin(np.arange(n), pi), "ring", "out"))
+    rows += _stats("ring", pd.Series(ring_cls(len(pts), pin, ppi), index=pts.index), RING_ORDER, RING_LABEL, pts,
+                   pd.DataFrame({"cls": ring_cls(len(hs), hin, hpi), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
+    comp = lic["PERUSAHAAN"].to_numpy() if len(lic) else np.array([], object)
+    rp = pd.DataFrame({"i": ppi, "company": comp[pli]}).drop_duplicates()     # ring points per holder, outside every licence
+    rp = rp[~pin[rp["i"].to_numpy(int)]]
+    rh = pd.DataFrame({"i": hpi, "company": comp[hli]}).drop_duplicates()
+    rh = rh[~hin[rh["i"].to_numpy(int)]]
+
     # target villages
     pv = pd.Series(False, index=pts.index)
     hv = pd.Series(False, index=hs.index)
@@ -258,25 +306,32 @@ def one(cfg, kid, name, g):
             log.warning("%s %s: class hotspots %d != hotspots %d", kid, layer, tot, len(hs))
 
     # actors: licence holders, by area, burned peat and hotspots this year
+    # holders with a licence or a ring in the KHG
     actors = []
-    if len(pl):
-        for comp, grp in pl.groupby("PERUSAHAAN"):
-            idx = grp.index.unique()
-            n_hs = int(hl.loc[hl["PERUSAHAAN"] == comp].index.nunique()) if len(hl) else 0
-            n_hs_p = int(hl.loc[(hl["PERUSAHAAN"] == comp) & hl["onp"]].index.nunique()) if len(hl) else 0
-            actors.append({"khg_id": kid, "khg": name, "company": comp, "type": ", ".join(sorted(set(grp["cls"].map(lambda c: LIC_LABEL.get(c, c))))),
-                           "activity": ", ".join(sorted(set(grp["KEG_USAHA"].dropna().astype(str)))),
-                           "area_km2": len(idx) * area_cell, "share_khg": len(idx) * area_cell / khg_km2,
-                           "burned_peat_km2": int((pts.loc[idx, "peat"] & pts.loc[idx, "burned"]).sum()) * area_cell,
-                           "lindung_km2": int((pcs["feg"].loc[idx] == "lindung").sum()) * area_cell,
-                           "forest_protected_km2": int(pcs["forest"].loc[idx].isin(["cons", "hl"]).sum()) * area_cell,
-                           "hs_now": n_hs, "hs_now_peat": n_hs_p})
-    actors.sort(key=lambda a: (-a["hs_now"], -a["area_km2"]))
+    peat, burned, onp = pts["peat"].to_numpy(), pts["burned"].to_numpy(), hs["onp"].to_numpy()
+    for comp in sorted((set(pl["PERUSAHAAN"]) if len(pl) else set()) | set(rp["company"])):
+        idx = pl.index[pl["PERUSAHAAN"] == comp].unique() if len(pl) else pd.Index([], dtype=int)
+        n_hs = int(hl.loc[hl["PERUSAHAAN"] == comp].index.nunique()) if len(hl) else 0
+        n_hs_p = int(hl.loc[(hl["PERUSAHAAN"] == comp) & hl["onp"]].index.nunique()) if len(hl) else 0
+        lr = lic[lic["PERUSAHAAN"] == comp]
+        ri = rp.loc[rp["company"] == comp, "i"].to_numpy(int)
+        hi_ = rh.loc[rh["company"] == comp, "i"].to_numpy(int)
+        actors.append({"khg_id": kid, "khg": name, "company": comp, "type": ", ".join(sorted(set(lr["cls"].dropna().map(lambda c: LIC_LABEL.get(c, c))))),
+                       "activity": ", ".join(sorted(set(lr["KEG_USAHA"].dropna().astype(str)))),
+                       "area_km2": len(idx) * area_cell, "share_khg": len(idx) * area_cell / khg_km2,
+                       "burned_peat_km2": int((pts.loc[idx, "peat"] & pts.loc[idx, "burned"]).sum()) * area_cell,
+                       "lindung_km2": int((pcs["feg"].loc[idx] == "lindung").sum()) * area_cell,
+                       "forest_protected_km2": int(pcs["forest"].loc[idx].isin(["cons", "hl"]).sum()) * area_cell,
+                       "hs_now": n_hs, "hs_now_peat": n_hs_p,
+                       "ring_km2": len(ri) * area_cell, "ring_peat_km2": int(peat[ri].sum()) * area_cell,
+                       "ring_burned_peat_km2": int((peat[ri] & burned[ri]).sum()) * area_cell,
+                       "ring_hs_now": len(hi_), "ring_hs_now_peat": int(onp[hi_].sum())})
+    actors.sort(key=lambda a: (-(a["hs_now"] + a["ring_hs_now"]), -a["area_km2"]))
 
     # map layers
     tol = 0.0003 + 0.00002 * np.sqrt(khg_km2)
     cl = lambda geoms: shapely.intersection(shapely.make_valid(geoms), g)
-    mp = {"forest": [], "feg": [], "licence": [], "village": []}
+    mp = {"forest": [], "feg": [], "licence": [], "village": [], "ring": []}
     for df, key in ((kws, "forest"), (feg, "feg")):
         if len(df):
             gc = cl(df.geometry.values)
@@ -295,6 +350,12 @@ def one(cfg, kid, name, g):
         for d in mp["licence"]:
             d.pop("a")
         mp["licence"] = mp["licence"][: oc["max_licence_polygons"]]
+    if len(lic):
+        lu = shapely.union_all(shapely.make_valid(lic_m))
+        for c, u in (("lic", lu), ("ring", lu.buffer(ring_m).difference(lu))):
+            u = shapely.intersection(shapely.make_valid(from_aea(u)), g)
+            if not u.is_empty:
+                mp["ring"].append({"c": c, "r": _rings(u, tol)})
     if len(vil):
         gc = cl(vil.geometry.values)
         for k, geom in enumerate(gc):
