@@ -198,6 +198,7 @@ def build(cfg, top_n, out_path):
                 "rank_now": None if pd.isna(row.get("peringkat_now")) else int(row.peringkat_now), "rank_now_n": None if pd.isna(row.get("peringkat_now_n")) else int(row.peringkat_now_n),
                 "tma_n": 0 if pd.isna(row.get("n_tma_stations")) else int(row.n_tma_stations), "tma_deep": None if pd.isna(row.get("tma_deep_share")) else round(float(row.tma_deep_share), 2),
                 "infra": int(row.get("n_infra_ada", 0) or 0), "desa": int(row.get("n_desa_target", 0) or 0),
+                "dmpg": int(row.get("n_dmpg", 0) or 0),
             },
         }
 

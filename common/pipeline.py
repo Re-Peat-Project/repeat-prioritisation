@@ -110,6 +110,24 @@ def merge_indicators(df: pd.DataFrame, table: pd.DataFrame, source: str = "extra
     return out
 
 
+BALANCE_COLUMNS = ("u_wb_mean", "u_deficit_months")
+
+
+def gate_balance(df: pd.DataFrame) -> pd.DataFrame:
+    """Blank the neraca air balance columns of units whose table says the order of sub-KHG is not stable
+    (balance_stable_ok = 0: the order changes between years or between ET sources, repeat_neraca.balance).
+    Units with the flag empty (KHG-level runs) or 1 keep their values."""
+    if "balance_stable_ok" not in df:
+        return df
+    bad = df["balance_stable_ok"].eq(0)
+    cols = [c for c in BALANCE_COLUMNS if c in df]
+    if bad.any() and cols:
+        log.info("neraca air balance not stable for %d units (balance_stable_ok = 0): %s left empty", int(bad.sum()), ", ".join(cols))
+        df = df.copy()
+        df.loc[bad, cols] = np.nan
+    return df
+
+
 def read_indicator_table(path) -> pd.DataFrame:
     import geopandas as gpd
     path = str(path)
@@ -215,6 +233,7 @@ def main(level: str, preset: dict, description: str, argv=None, score=None, clas
     df = pd.concat(frames, ignore_index=True)
     for f in cfg["extra_indicators"] or []:
         df = merge_indicators(df, read_indicator_table(f), str(f))
+    df = gate_balance(df)
     scored, report = (score or SC.score)(df, cfg)
     corr = report.pop("_corr", None)
     gdf = units.merge(scored.drop(columns=["khg_id"]), on="unit_id", how="inner")

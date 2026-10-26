@@ -2,7 +2,7 @@
 """Build the HTML page that explains sub-KHG delineation and prioritisation and shows a run's outputs on a map.
 
   python -m subkhg.dashboard --subkhg-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/subkhg.yaml \\
-      --neraca-config ../re-peat/sites/14.02-04-05.01_kampar_gaung/neraca_experiments.yaml --out docs/process/subkhg_process.html
+      --neraca-dir $REPEAT_KHG/14.02-04-05.01_kampar_gaung/03_neraca --out docs/process/subkhg_process.html
 
 One self-contained file (no server, no internet): the process diagram with the numbers of the run, the delineation funnel,
 a map of the sub-KHG coloured by any output or indicator (with canals, rivers, canal blocks and water-table stations as
@@ -78,9 +78,8 @@ def _n(x):
     return f"{int(x):,}"
 
 
-def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
+def build(subkhg_config: str, neraca_dir: str | None, out: str) -> None:
     sc = pipeline.load_config(subkhg_config, SUBKHG_PRESET, "subkhg")
-    nc = pipeline.load_config(neraca_config, {}, "neraca") if neraca_config else None
     od = Path(sc["out"])
     g = gpd.read_file(od / "unit_prioritas.gpkg").to_crs(4326)
     lap = json.load(open(od / "laporan.json", encoding="utf-8"))
@@ -94,7 +93,7 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
     for key, label, group, kind in VARS:
         if key in g.columns and g[key].notna().any() and (kind != "cont" or g[key].nunique() > 1):
             vars_.append({"key": key, "label": label, "group": group, "kind": kind})
-    cols = ["unit_id"] + [v["key"] for v in vars_ if v["key"] != "kelas"] + ["kelas", "cakupan_ranksum", "neraca_skill_ok"]
+    cols = ["unit_id"] + [v["key"] for v in vars_ if v["key"] != "kelas"] + ["kelas", "cakupan_ranksum", "neraca_skill_ok", "balance_stable_ok"]
     cols = [c for c in dict.fromkeys(cols) if c in g.columns]
     units = K.pack_polygons(g, cols)
 
@@ -117,13 +116,13 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
     geo["khg"] = K._rings(khg.geometry.union_all(), 0.0008)
     stations = []
     n_st = None
-    if nc:
-        sp = Path(nc["out"]) / "neraca_stations.csv"
-        if sp.exists():
-            s = pd.read_csv(sp)
-            n_st = len(s)
-            stations = [{"x": round(r.lon, 4), "y": round(r.lat, 4), "id": r.station_id, "obs": None if pd.isna(r.obs_peak_cm) else round(r.obs_peak_cm, 1)}
-                        for r in s.itertuples()]
+    sp = Path(neraca_dir) / "inputs" / "stations.csv" if neraca_dir else None
+    if sp is not None and sp.exists():
+        s = pd.read_csv(sp)
+        peak = pd.read_csv(sp.parent / "stations_daily.csv").groupby("station_id")["depth_cm"].quantile(0.95)   # observed peak depth
+        n_st = len(s)
+        stations = [{"x": round(r.lon, 4), "y": round(r.lat, 4), "id": r.station_id, "obs": None if pd.isna(peak.get(r.station_id)) else round(peak[r.station_id], 1)}
+                    for r in s.itertuples()]
     b = khg.total_bounds
     sweep_path = Path(sc["units"]["path"]).parent / "delineation_sweep.json"
     sweep = json.load(open(sweep_path, encoding="utf-8")) if sweep_path.exists() else None
@@ -153,7 +152,8 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
     forest_med = float(g["i_forest"].median()) if "i_forest" in g.columns else None
     agree = lap.get("ranking_agreement") or {}
     pairs = lap.get("correlated_pairs", [])
-    skill_ok = int(g["neraca_skill_ok"].iloc[0]) if "neraca_skill_ok" in g.columns and g["neraca_skill_ok"].notna().any() else None
+    flag = "balance_stable_ok" if "balance_stable_ok" in g.columns else "neraca_skill_ok"     # repeat_neraca.balance, or the older tables
+    skill_ok = int(g[flag].iloc[0]) if flag in g.columns and g[flag].notna().any() else None
     yrs = sc["years"]["baseline"]
     base = f"{yrs[0]}-{yrs[1]}"
     res = sc["sources"]["ndmi"].get("res_m", 20)
@@ -219,7 +219,7 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
         "in_loc": {"title": "Peat depth and canal blocks", "body": [f"Peat depth: raster in centimetres, converted with <code>peat_depth_scale: 0.01</code>. {floor_txt + ' (a floor); ' if floor_txt else ''}{floor_units} of {peat_n} sub-KHG have a mean at the lowest value." if floor_units is not None else "Peat depth raster.",
                                                                f"Existing canal blocks: {_n(n_blk)} points (BRGM file, <code>Jenis = Sekat Kanal</code>, <code>REALISASI</code>), compared with the blocks the spacing rule asks for."]},
         "in_tma": {"title": "Water table and neraca air", "body": [f"SiTMAT concession stations{f' ({n_st} inside the KHG)' if n_st else ''}: a current-state indicator for 2026-04-01 to 2026-10-15 (the record is one season). {tma_units} of {n_units} sub-KHG contain a station." if tma_units is not None else "SiTMAT stations.",
-                                                         "The neraca air table is merged through <code>extra_indicators</code>; its columns are not scored unless given a weight, and carry <code>neraca_skill_ok</code>." + (" In this run the module failed its skill check (flag 0)." if skill_ok == 0 else "")]},
+                                                         "The neraca air table (climatic balance per sub-KHG, repeat_neraca.balance) is merged through <code>extra_indicators</code>: <code>u_wb_mean</code> and <code>u_deficit_months</code> replace the TerraClimate columns and enter the rank-sum; in the need score they have no weight unless one is set. They are left empty where <code>balance_stable_ok</code> is 0." + (" In this run the flag is 0." if skill_ok == 0 else "")]},
         "in_cloud": {"title": "Cloud layers", "body": [f"Sentinel-2 L2A NDMI and NDVI (dry-season median, {res} m here), MODIS burned area, FIRMS VIIRS hotspots, ESA WorldCover, JRC surface water, TerraClimate.",
                                                         "Read per KHG window from STAC and Zarr, never downloaded whole. ERA5 rainfall is off in this run: its indicators have weight 0."]},
         "p_delin": {"title": "1 Delineate sub-KHG (repeat-delineation repo)", "body": [
@@ -254,7 +254,8 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
     if forest_med is not None:
         caveats.append(("warn", f"<b>Tree cover share is high (median {forest_med:.2f})</b> because WorldCover counts plantations as tree cover, so it cannot separate natural forest from acacia."))
     if skill_ok == 0:
-        caveats.append(("bad", f"<b>Neraca air failed its skill check</b> on the {n_st} SiTMAT stations (no spatial skill), so its outputs are shown for reference only and have no weight in the need score."))
+        caveats.append(("bad", "<b>Neraca air balance does not rank these sub-KHG</b>: the order changes between years or between ET sources (balance_stable_ok = 0), so u_wb_mean and u_deficit_months are left empty."
+                        if flag == "balance_stable_ok" else f"<b>Neraca air failed its skill check</b> on the {n_st} SiTMAT stations (no spatial skill), so its outputs are shown for reference only and have no weight in the need score."))
     if pairs:
         caveats.append(("warn", "<b>Overlapping indicators:</b> " + ", ".join(f"{p['a']} and {p['b']} (rho {p['spearman']})" for p in pairs) + "."))
     caveats.append(("warn", f"<b>Not validated.</b> No held-out outcome was set, the weights are defaults, Sentinel-2 is at {res} m, and the merge of small pieces is by longest shared divide, not by a hydrological hierarchy."))
@@ -292,7 +293,7 @@ def build(subkhg_config: str, neraca_config: str | None, out: str) -> None:
     data = {"units": units, "vars": vars_, "geo": geo, "stations": stations, "bounds": [float(b[0]), float(b[1]), float(b[2]), float(b[3])],
             "details": details, "sweep": sweep, "merge": merge, "classes": CLASSES, "n_units": n_units, "min_area": min_area,
             "agree": agree, "neraca_ok": skill_ok, "method": lap.get("method")}
-    foot = ("Generated by <code>python -m subkhg.dashboard --subkhg-config " + subkhg_config + (f" --neraca-config {neraca_config}" if neraca_config else "")
+    foot = ("Generated by <code>python -m subkhg.dashboard --subkhg-config " + subkhg_config + (f" --neraca-dir {neraca_dir}" if neraca_dir else "")
             + f"</code> on {datetime.date.today()} from the output folders of the run. Steps, settings and reasons: <code>re-peat/sites/{Path(subkhg_config).parent.name}/README.md</code>.")
     facts = [("KHG", kid), ("Sub-KHG", str(n_units)), ("Area", f"{area_tot:,.0f} km2"), ("Baseline", base), ("Method in use", str(lap.get("method"))), ("Generated", str(datetime.date.today()))]
     html_ = K.page("Sub-KHG prioritisation", "How sub-KHG are delineated and ranked by need for intervention, with the outputs of one real run on a map.", facts,
@@ -370,10 +371,10 @@ setLegend();map.draw();
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--subkhg-config", required=True)
-    ap.add_argument("--neraca-config")
+    ap.add_argument("--neraca-dir", help="the KHG's 03_neraca folder (stations from inputs/)")
     ap.add_argument("--out", default="docs/process/subkhg_process.html")
     a = ap.parse_args(argv)
-    build(a.subkhg_config, a.neraca_config, a.out)
+    build(a.subkhg_config, a.neraca_dir, a.out)
 
 
 if __name__ == "__main__":

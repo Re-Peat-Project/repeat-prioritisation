@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Land-status overlays for the profiled KHG: forest area function, peat ecosystem function (FEG), business licences
-and the Bluebook target villages, crossed with peat, burned area and this year's hotspots.
+and the Bluebook target villages (with the DPG villages of the BRG atlas among them), crossed with peat, burned area and
+this year's hotspots.
 
   python -m national.overlay --config configs/examples/national_stage3.yaml
 
@@ -195,7 +196,8 @@ def one(cfg, kid, name, g):
     feg["cls"] = np.where(feg["FEG_KGHLTR"].str.contains("Lindung", na=False), "lindung", "budidaya")
     lic = _read(data / inp["licences"], g, ["PERUSAHAAN", "IZIN_USAHA", "KEG_USAHA"])
     lic["cls"] = lic["IZIN_USAHA"].map(LIC_VALUE)
-    vil = _read(data / inp["villages"], g, ["DESA_2023", "KEC_2023", "KABKO_2023"])
+    vil = _read(data / inp["villages"], g, ["OBJECTID", "DESA_2023", "KEC_2023", "KABKO_2023"])
+    vil["dmpg"] = vil["OBJECTID"].isin(P.dmpg_ids(data / inp["dmpg"])) if inp.get("dmpg") else False
 
     rows, report, pcs = [], {}, {}
     for layer, df, col, order, labels in (("forest", kws, "cls", KWS_ORDER, KWS_LABEL), ("feg", feg, "cls", FEG_ORDER, FEG_LABEL)):
@@ -236,6 +238,16 @@ def one(cfg, kid, name, g):
             hv[gpd.sjoin(hs[["geometry"]], vil[["geometry"]], how="inner", predicate="within").index.unique()] = True
     rows += _stats("village", pd.Series(np.where(pv, "in", "out"), index=pts.index), ["in"], {"in": "Target village"}, pts,
                    pd.DataFrame({"cls": np.where(hv, "in", "out"), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
+    # DPG villages of the BRG atlas (a subset of the target villages): context, not scored
+    pd_ = pd.Series(False, index=pts.index)
+    hd = pd.Series(False, index=hs.index)
+    dv = vil[vil["dmpg"]] if len(vil) else vil
+    if len(dv):
+        pd_[gpd.sjoin(pts[["geometry"]], dv[["geometry"]], how="inner", predicate="within").index.unique()] = True
+        if len(hs):
+            hd[gpd.sjoin(hs[["geometry"]], dv[["geometry"]], how="inner", predicate="within").index.unique()] = True
+    rows += _stats("dmpg", pd.Series(np.where(pd_, "in", "out"), index=pts.index), ["in"], {"in": "DPG village"}, pts,
+                   pd.DataFrame({"cls": np.where(hd, "in", "out"), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
 
     for r in rows:
         r.update({"khg_id": kid, "khg": name})
@@ -287,7 +299,8 @@ def one(cfg, kid, name, g):
         gc = cl(vil.geometry.values)
         for k, geom in enumerate(gc):
             if not geom.is_empty:
-                mp["village"].append({"n": f'{vil["DESA_2023"].iloc[k]}, {vil["KEC_2023"].iloc[k]}', "r": _rings(geom, tol)})
+                mp["village"].append({"n": f'{vil["DESA_2023"].iloc[k]}, {vil["KEC_2023"].iloc[k]}', "r": _rings(geom, tol),
+                                      **({"d": 1} if vil["dmpg"].iloc[k] else {})})
     mp["cell_m"] = cell
     return rows, actors, mp
 

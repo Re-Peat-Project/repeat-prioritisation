@@ -143,11 +143,11 @@ What is **not** open: weir operating rules and water-level targets per concessio
 
 SIPALAGA (BRG, sipalaga.brg.go.id): a crawl of its daily PDF reports is in `C:/Users/danyl/Documents/Github/sipalaga-crawler` (outside this repo). The CSVs hold hourly groundwater level, soil moisture and **station rainfall** for BRG's own stations, but only **2019-02-19 to 2019-03-17** (about four wet-season weeks), with no coordinates (names only). Inside our two test KHG: SUNGAI_GAUNG_1/2 (Kampar-Gaung) and PADANG_SUGIHAN_1-3, PS1-SEBOKOR, LUMPUR1/2 (Sugihan-Lumpur). Use: a check of CHIRPS and ERA5 rain against gauges in that window; too short and too wet to calibrate neraca air. Not ingested yet. If the crawler runs again it could build a multi-year record.
 
-Sentinel-1 result (`python -m repeat_neraca.bucket.sentinel1`, report in `repeat-neraca/docs/bucket_reports/kampar_gaung_sentinel1.md`): within a station a brighter VV scene
+Sentinel-1 result (retired bucket experiment `repeat_neraca.bucket.sentinel1`, report in `repeat-neraca/docs/bucket_reports/kampar_gaung_sentinel1.md`): within a station a brighter VV scene
 falls on a shallower water table (median Spearman -0.38); across stations the VV-VH ratio ranks peak depth (0.53; out-of-fold RMSE 20.6 against 24.6 cm
 for no skill) but not the share of days deeper than 40 cm. Per orbit the result is the same (0.52 for both tracks) and inside the tree class it is 0.48, so it is not geometry or WorldCover class. But concession (read from the SiTMAT station id) explains 64% of peak depth variance and carries much of the radar signal: inside concessions rho is 0.21; with whole concessions held out, RMSE 23 against 28 cm. Radar sees management differences between concessions more than differences inside them.
 
 Suggested order of the remaining tests (each one a repo script scored with the same spatial cross-validation and verdict gate):
 1. Concession polygons and water-level targets from the concession holders (GFW wood-fibre polygons are view-only, oil palm alone is incomplete).
 2. MOD16 ET and CHIRPS in place of ERA5 E and P: does the out-of-fold RMSE beat the no-skill baseline (15.3 cm)?
-3. Concession type as a covariate in `repeat_neraca.bucket.covariates`.
+3. Concession type as a covariate (was `repeat_neraca.bucket.covariates`, retired 2026-10-26).

@@ -53,6 +53,7 @@ DEFAULTS = {
         "canals": "kanal_osgm_khg_existing_Indonesia.gpkg",
         "blocks": "infrastruktur_hidrologis_existing_BRGM_Indonesia.gpkg",
         "villages": "desa_target_pemulihan_ekosistem_gambut.gpkg",
+        "dmpg": "dpg/dpg_atlas_villages.csv",   # DPG villages of the BRG atlas matched to the target villages (repeat_common.fetch_dpg_atlas); context, not scored
         "peat_depth": "kedalaman_gambut_bbsdlp.gpkg",
         "hotspots_now": "_data_hotspot_Januari_September_2026.gpkg",   # KLH-curated MODIS hotspots of the current year, monthly layers
     },
@@ -324,8 +325,15 @@ def canal_length(path, khg):
     return pd.DataFrame(rows, columns=["khg_id", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary"])
 
 
-def count_inside(path, khg, name, rep="point"):
-    g = pyogrio.read_dataframe(path, columns=[])
+def dmpg_ids(path):
+    """OBJECTID of the target villages that are DPG villages in the BRG atlas (column target_objectid)."""
+    return set(pd.read_csv(path)["target_objectid"].dropna().astype(int)) if path.exists() else set()
+
+
+def count_inside(path, khg, name, rep="point", ids=None):
+    g = pyogrio.read_dataframe(path, columns=[] if ids is None else ["OBJECTID"])
+    if ids is not None:
+        g = g[g["OBJECTID"].isin(ids)]
     if rep == "centroid":
         g = gpd.GeoDataFrame(geometry=g.representative_point(), crs=g.crs)
     j = gpd.sjoin(g, khg[["khg_id", "geometry"]], how="inner", predicate="within")
@@ -393,6 +401,8 @@ def build_profile(cfg, only=None):
     canals = canal_length(p("canals"), khg)
     blocks = count_inside(p("blocks"), khg, "n_infra_ada")
     desa = count_inside(p("villages"), khg, "n_desa_target", rep="centroid")
+    if inp.get("dmpg"):
+        desa = desa.merge(count_inside(p("villages"), khg, "n_dmpg", rep="centroid", ids=dmpg_ids(p("dmpg"))), on="khg_id", how="left")
     peat = peat_depth(p("peat_depth"), khg)
     tma = tma_by_khg(cfg["tma"], khg) if cfg["tma"].get("path") else None
 
@@ -402,8 +412,9 @@ def build_profile(cfg, only=None):
             prof = prof.merge(t, on="khg_id", how="left")
     if tma is not None:
         prof["n_tma_stations"] = prof["n_tma_stations"].fillna(0)
-    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary", "n_infra_ada", "n_desa_target"):
-        prof[c] = prof[c].fillna(0)
+    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary", "n_infra_ada", "n_desa_target", "n_dmpg"):
+        if c in prof:
+            prof[c] = prof[c].fillna(0)
     A = prof["area_km2"]
     if sampler is not None:
         prof["peat_km2"] = prof["area_km2"] * prof["peat_frac"]
