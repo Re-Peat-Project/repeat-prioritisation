@@ -3,9 +3,9 @@
 
   python -m repeat_prioritisation.investigations.dmpg --config configs/investigations/dmpg.yaml [--reuse]
 
-Units: the 2,004 Bluebook 2026 target villages (desa_target_pemulihan_ekosistem_gambut.gpkg). Treated: the villages of the
-BRG Atlas Desa Peduli Gambut matched to a target polygon (repeat_common.fetch_dpg_atlas, column target_objectid), mapped
-June 2018 to July 2019. Controls: the other target villages, compared inside the same KHG. A second comparison takes, in every
+Units: the 2,004 Bluebook 2026 target villages (desa_target_pemulihan_ekosistem_gambut.gpkg) plus the DPG villages that are
+not among them. Treated: the villages of the BRG Atlas Desa Peduli Gambut with a boundary (repeat_common.fetch_dpg_atlas,
+fetch_dpg_boundaries; KLH 2023 polygons, BIG 2026 as fallback), mapped June 2018 to July 2019. Controls: the other target villages, compared inside the same KHG. A second comparison takes, in every
 KHG that holds DPG villages, the DPG part of the KHG against the rest of the KHG, so it does not depend on how the Bluebook
 picked its targets in 2026.
 Fire per unit and year with the national profile readers: FIRMS VIIRS hotspots 2012-2025 (main outcome, per km2 of peat),
@@ -48,6 +48,7 @@ from repeat_prioritisation.national import profile as P  # noqa: E402
 log = logging.getLogger("investigations.dmpg")
 VIIRS_YEARS = list(range(2012, 2026))
 BURN_YEARS = list(range(2015, 2026))
+EXTRA_ID = 900_000     # OBJECTID offset of DPG villages that are not Bluebook target villages
 C_DPG, C_CTL, C_NOW = "#eb6834", "#2a78d6", "#52514e"
 
 
@@ -57,9 +58,16 @@ def villages(cfg):
     data, inp = Path(cfg["data"]), cfg["inputs"]
     v = pyogrio.read_dataframe(data / inp["villages"], columns=["OBJECTID", "PROV_2023", "KABKO_2023", "KEC_2023", "DESA_2023"])
     v["geometry"] = shapely.make_valid(v.geometry.values)
-    dpg = pd.read_csv(data / inp["dpg"])
+    dpg = pyogrio.read_dataframe(data / inp["dpg"])
+    dpg = dpg[dpg.geometry.notna()].assign(geometry=lambda d: shapely.make_valid(d.geometry.values))
     ids = dpg.dropna(subset=["target_objectid"]).assign(target_objectid=lambda d: d.target_objectid.astype(int))
     v = v.merge(ids[["target_objectid", "mapped"]].rename(columns={"target_objectid": "OBJECTID"}), on="OBJECTID", how="left")
+    # DPG villages outside the Bluebook target villages: own units, OBJECTID = EXTRA_ID + feature id in the boundary source
+    extra = dpg[dpg["target_objectid"].isna()]
+    v = pd.concat([v, gpd.GeoDataFrame({"OBJECTID": EXTRA_ID + extra["boundary_id"].astype(int).to_numpy(), "PROV_2023": extra["province"].to_numpy(),
+                                        "KABKO_2023": extra["kabupaten"].to_numpy(), "KEC_2023": extra["kecamatan"].to_numpy(),
+                                        "DESA_2023": extra["desa"].to_numpy(), "mapped": extra["mapped"].to_numpy()},
+                                       geometry=extra.geometry.to_numpy(), crs=extra.crs)], ignore_index=True)
     v["dpg"] = v["mapped"].notna()
     khg = P.load_khg({"data": cfg["data"], "inputs": {"khg": inp["khg"]}, "registry": cfg["registry"]})
     rp = gpd.GeoDataFrame(geometry=v.geometry.representative_point(), crs=v.crs)
@@ -320,7 +328,7 @@ def report(cfg, R, path):
          "KLH stated in a meeting that 99% of DMPG villages had no fire; no source file for that figure is in the workspace.", "",
          "## Villages", "",
          f"- DPG: {R['n_dpg']} of the {R['n_atlas']} villages of the BRG Atlas Desa Peduli Gambut (participatory mapping June 2018 to "
-         f"July 2019), matched by name to the Bluebook 2026 target village polygons; {R['n_dpg_khg']} lie in a KHG.",
+         f"July 2019), matched by name to village boundaries (KLH 2023, BIG 2026); {R['n_dpg_khg']} lie in a KHG.",
          f"- Comparison: the other {R['n_ctl']} target villages, always within the same KHG.",
          "- The atlas is part of the DPG programme and holds none of the DMPG villages added later; the official DMPG list is not in the workspace.", "",
          "## The 99% figure", "",
@@ -383,7 +391,7 @@ def report(cfg, R, path):
           "- Hotspots mark active fire at the satellite overpass; small or short fires are missed.",
           "- Fire is concentrated in dry years (2014, 2015, 2019, 2023); ratios in wet years rest on few hotspots.",
           "", "## Data", "",
-          "- Villages: Bluebook 2026 target villages (`desa_target_pemulihan_ekosistem_gambut.gpkg`); BRG Atlas Desa Peduli Gambut (`dpg/dpg_atlas_villages.csv`).",
+          "- Villages: Bluebook 2026 target villages (`desa_target_pemulihan_ekosistem_gambut.gpkg`); BRG Atlas Desa Peduli Gambut (`dpg/dpg_villages_boundaries.gpkg`).",
           "- Fire: FIRMS VIIRS S-NPP 2012-2025, nominal and high confidence, vegetation fires (`hotspot_viirs_snpp_2012_2025.gpkg`); "
           "burned area 2015-2026 (`burnt_area_2015_2026_Indonesia.gpkg`); KLH MODIS hotspots January-September 2026, medium and high (`_data_hotspot_Januari_September_2026.gpkg`).",
           "- Peat: GFW composite peat extent. Licences: business licences 2025 (`landstatus/`). KHG: SK.129/2017 boundaries.", ""]
@@ -474,7 +482,7 @@ def page_data(cfg, R, rates, mapd):
                  "rest of the KHG, which does not depend on how the Bluebook picked its target villages.",
         "forest": forest,
         "table": {"cols": ["Compared with", "Measure", "Years", "Rate ratio", "95% interval", "DPG units", "Other units"], "rows": rows},
-        "method": [f"Units: the {R['n_dpg'] + R['n_ctl']:,} Bluebook 2026 target villages; DPG = the {R['n_dpg']} of the {R['n_atlas']} BRG atlas villages matched to a target polygon by name.",
+        "method": [f"Units: the Bluebook 2026 target villages and the DPG villages outside them ({R['n_dpg'] + R['n_ctl']:,} in all); DPG = the {R['n_dpg']} of the {R['n_atlas']} BRG atlas villages with a boundary (KLH 2023, BIG 2026), matched by name.",
                    "Fire per village and year: FIRMS VIIRS hotspots on peat (2012-2025), burned peat (2015-2025), KLH MODIS hotspots (2026, January to September); peat from the GFW composite extent.",
                    "Rate ratio: Mantel-Haenszel, DPG against other villages, stratified by KHG, so every comparison is inside one KHG.",
                    "Intervals: villages resampled within KHG and group (KHG resampled whole for the rest-of-KHG design).",
@@ -484,7 +492,7 @@ def page_data(cfg, R, rates, mapd):
                    "Village outlines are the Bluebook 2026 polygons, not the boundaries drawn in the participatory mapping.",
                    "Hotspots mark active fire at the satellite overpass; small or short fires are missed.",
                    "Fire is concentrated in dry years; ratios in wet years rest on few hotspots."],
-        "data": ["Bluebook 2026 target villages: desa_target_pemulihan_ekosistem_gambut.gpkg. BRG Atlas Desa Peduli Gambut: dpg/dpg_atlas_villages.csv (repeat_common.fetch_dpg_atlas).",
+        "data": ["Bluebook 2026 target villages: desa_target_pemulihan_ekosistem_gambut.gpkg. BRG Atlas Desa Peduli Gambut: dpg/dpg_villages_boundaries.gpkg (repeat_common.fetch_dpg_atlas, fetch_dpg_boundaries; boundaries from batas_desa_indonesia_2023_KLH.gpkg).",
                  "FIRMS VIIRS S-NPP 2012-2025, nominal and high confidence, vegetation fires. Burned area 2015-2026. KLH MODIS hotspots January-September 2026, medium and high.",
                  "GFW composite peat extent. Business licences 2025. KHG boundaries SK.129/2017.",
                  "Rerun: python -m repeat_prioritisation.investigations.dmpg --config configs/investigations/dmpg.yaml (--reuse reads the cached fire table)."]}
@@ -548,7 +556,7 @@ def run(cfg, reuse=False):
         uy.to_csv(out / "unit_year.csv", index=False)
     vu, hu = units[units["kind"] == "village"], units[units["kind"] == "khg_half"]
     mp, pf = cfg["min_peat_km2"], cfg["post_from"]
-    R = {"n_atlas": int(len(pd.read_csv(Path(cfg["data"]) / cfg["inputs"]["dpg"]))), "n_dpg": int(vu["dpg"].sum()),
+    R = {"n_atlas": int(len(pyogrio.read_dataframe(Path(cfg["data"]) / cfg["inputs"]["dpg"], read_geometry=False))), "n_dpg": int(vu["dpg"].sum()),
          "n_dpg_khg": int((vu["dpg"] & vu["khg"].notna()).sum()), "n_ctl": int((~vu["dpg"]).sum())}
     R["no_fire_dpg"], R["no_fire_ctl"] = no_fire(vu, uy, True), no_fire(vu, uy, False)
     nf, nc = pd.DataFrame(R["no_fire_dpg"]).set_index("year"), pd.DataFrame(R["no_fire_ctl"]).set_index("year")

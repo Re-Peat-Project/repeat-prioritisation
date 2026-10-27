@@ -52,7 +52,7 @@ DEFAULTS = {
         "canals": "kanal_osgm_khg_existing_Indonesia.gpkg",
         "blocks": "infrastruktur_hidrologis_existing_BRGM_Indonesia.gpkg",
         "villages": "desa_target_pemulihan_ekosistem_gambut.gpkg",
-        "dmpg": "dpg/dpg_atlas_villages.csv",   # DPG villages of the BRG atlas matched to the target villages (repeat_common.fetch_dpg_atlas); context, not scored
+        "dmpg": "dpg/dpg_villages_boundaries.gpkg",   # DPG villages of the BRG atlas with KLH 2023 / BIG 2026 boundaries (repeat_common.fetch_dpg_boundaries); context, not scored
         "peat_depth": "kedalaman_gambut_bbsdlp.gpkg",
         "hotspots_now": "_data_hotspot_Januari_September_2026.gpkg",   # KLH-curated MODIS hotspots of the current year, monthly layers
     },
@@ -326,11 +326,14 @@ def canal_length(path, khg):
 
 def dmpg_ids(path):
     """OBJECTID of the target villages that are DPG villages in the BRG atlas (column target_objectid)."""
-    return set(pd.read_csv(path)["target_objectid"].dropna().astype(int)) if path.exists() else set()
+    if not path.exists():
+        return set()
+    return set(pyogrio.read_dataframe(path, columns=["target_objectid"], read_geometry=False)["target_objectid"].dropna().astype(int))
 
 
 def count_inside(path, khg, name, rep="point", ids=None):
     g = pyogrio.read_dataframe(path, columns=[] if ids is None else ["OBJECTID"])
+    g = g[g.geometry.notna()]
     if ids is not None:
         g = g[g["OBJECTID"].isin(ids)]
     if rep == "centroid":
@@ -403,7 +406,7 @@ def build_profile(cfg, only=None, khg=None):
     blocks = count_inside(p("blocks"), khg, "n_infra_ada")
     desa = count_inside(p("villages"), khg, "n_desa_target", rep="centroid")
     if inp.get("dmpg"):
-        desa = desa.merge(count_inside(p("villages"), khg, "n_dmpg", rep="centroid", ids=dmpg_ids(p("dmpg"))), on="khg_id", how="left")
+        desa = desa.merge(count_inside(p("dmpg"), khg, "n_dmpg", rep="centroid"), on="khg_id", how="left")
     peat = peat_depth(p("peat_depth"), khg)
     tma = tma_by_khg(cfg["tma"], khg) if cfg["tma"].get("path") else None
 

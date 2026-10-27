@@ -480,7 +480,7 @@ function initProfileMap(){
     fillOv("p-ov-forest","p-ov-forest",.55);fillOv("p-ov-feg","p-ov-feg",.55);fillOv("p-ov-lic","p-ov-lic",.38);fillOv("p-ov-ring","p-ov-ring",.45);
     pmap.addLayer({id:"p-ov-lic-line",type:"line",source:"p-ov-lic",layout:{visibility:"none"},paint:{"line-color":"#888","line-width":1.3}},before);
     fillOv("p-ov-vil-f","p-ov-vil",["case",["==",["get","d"],1],.3,.02]);
-    pmap.addLayer({id:"p-ov-vil",type:"line",source:"p-ov-vil",layout:{visibility:"none"},paint:{"line-color":"#6250d6","line-width":1.6,"line-dasharray":[3,2]}},before);
+    pmap.addLayer({id:"p-ov-vil",type:"line",source:"p-ov-vil",filter:["!=",["get","x"],1],layout:{visibility:"none"},paint:{"line-color":"#6250d6","line-width":1.6,"line-dasharray":[3,2]}},before);
     pmap.addLayer({id:"p-burn",type:"fill",source:"p-burn",paint:{"fill-color":"#2a78d6","fill-opacity":.85}},before);
     const w=(a,b)=>["interpolate",["linear"],["zoom"],7,a,14,b];
     pmap.addLayer({id:"p-canal-t",type:"line",source:"p-canal-t",layout:{"line-join":"round"},paint:{"line-color":"#1baf7a","line-width":w(.3,1),"line-opacity":.55}},before);
@@ -496,7 +496,7 @@ function initProfileMap(){
     const lab=(layer,c)=>t((OVCLS[layer].find(a=>a[0]===c)||[0,""])[1]);
     ovHover("p-ov-forest",p=>`<b>${lab("forest",p.c)}</b>`);ovHover("p-ov-feg",p=>`<b>${lab("feg",p.c)}</b>`);ovHover("p-ov-ring",p=>`<b>${lab("ring",p.c)}</b>`);
     ovHover("p-ov-lic",p=>`<b>${esc(p.n||lab("licence",p.c))}</b><br><span>${lab("licence",p.c)}</span>`);
-    ovHover("p-ov-vil-f",p=>`<b>${esc(p.n)}</b><br><span>${t("Target village")}</span>`+(p.d?`<br><span>${t("DPG village, BRG atlas 2018-2019")}</span>`:""));
+    ovHover("p-ov-vil-f",p=>`<b>${esc(p.n)}</b><br><span>${t(p.x?"Not a target village":"Target village")}</span>`+(p.d?`<br><span>${t("DPG village, BRG atlas 2018-2019")}</span>`:""));
     pReady=true;pTheme();applyLayerToggles();
     if(pPending!==undefined)setProfileData(pPending);
   });
@@ -518,7 +518,7 @@ function setProfileData(P){
   pmap.getSource("p-peat").setData(fc((L.peat&&L.peat.length)?[{type:"Feature",properties:{},geometry:{type:"MultiPolygon",coordinates:L.peat}}]:[]));
   const O=L.ov||{},poly=(arr,f)=>fc((arr||[]).map(x=>({type:"Feature",properties:f(x),geometry:{type:"MultiPolygon",coordinates:x.r}})));
   pmap.getSource("p-ov-forest").setData(poly(O.forest,x=>({c:x.c})));pmap.getSource("p-ov-feg").setData(poly(O.feg,x=>({c:x.c})));
-  pmap.getSource("p-ov-lic").setData(poly(O.licence,x=>({c:x.c,n:x.n})));pmap.getSource("p-ov-ring").setData(poly(O.ring,x=>({c:x.c})));pmap.getSource("p-ov-vil").setData(poly(O.village,x=>({n:x.n,d:x.d||0})));
+  pmap.getSource("p-ov-lic").setData(poly(O.licence,x=>({c:x.c,n:x.n})));pmap.getSource("p-ov-ring").setData(poly(O.ring,x=>({c:x.c})));pmap.getSource("p-ov-vil").setData(poly(O.village,x=>({n:x.n,d:x.d||0,x:x.x||0})));
   const b=L.bounds;pmap.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:28,duration:0,maxZoom:14});
 }
 function drawMap(P){
@@ -565,7 +565,7 @@ function renderOv(P){
   groups.push({layer:"licence",title:"Licences",tip:"Business licences, 2025 update. Licences overlap, so the segments can add up to more than the peat; the grey segment is peat with no licence.",rows:lic});
   groups.push({layer:"ring",title:"5 km ring",tip:"Peat in a licence, within 5 km of one but inside none, or farther. The three classes add up. Licences outside the KHG count when their ring reaches into it.",rows:mkRows("ring",OVCLS.ring.map(a=>a[0]))});
   groups.push({layer:"village",title:"Target villages",tip:"Village areas targeted for peat restoration in the 2026 Bluebook.",rows:[{c:"in",l:"Target village",v:val("village","in")},{c:"out",l:"Outside target villages",v:tot.map((x,k)=>Math.max(0,x-val("village","in")[k]))}]});
-  groups.push({layer:"dmpg",title:"DPG villages",tip:"Desa Peduli Gambut villages mapped in 2018-2019 in the BRG atlas and matched by name to the target village polygons. Only part of all DPG and DMPG villages. Context, not scored.",rows:[{c:"in",l:"DPG village (BRG atlas)",v:val("dmpg","in")},{c:"out",l:"Outside DPG villages",v:tot.map((x,k)=>Math.max(0,x-val("dmpg","in")[k]))}]});
+  groups.push({layer:"dmpg",title:"DPG villages",tip:"Desa Peduli Gambut villages mapped in 2018-2019 in the BRG atlas and matched by name to village boundaries (KLH 2023, BIG 2026). Only part of all DPG and DMPG villages. Context, not scored.",rows:[{c:"in",l:"DPG village (BRG atlas)",v:val("dmpg","in")},{c:"out",l:"Outside DPG villages",v:tot.map((x,k)=>Math.max(0,x-val("dmpg","in")[k]))}]});
   const rowLab=[["Peat area","Peat area in each class, from the GFW peat extent."],["Burned peat","Peat that burned at least once in 2015 to 2025 (burnt-area polygons)."],["Hotspots this year","KLH MODIS hotspots on peat this year, medium and high confidence."]];
   const totTxt=[fmt(tot[0],0)+" km2",fmt(tot[1],0)+" km2",fmt(tot[2],0)];
   let html=`<div class="ovhead"><h3 class="hasTip"${tipAttr(t("Where the peat, the burned peat and this year's hotspots fall on each land-status layer. A segment wider in the lower bars than in the top bar means fire is over-represented in that class."))}>${t("Land status of the peat")}</h3></div><div class="ovgrid">`;

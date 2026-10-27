@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Land-status overlays for the profiled KHG: forest area function, peat ecosystem function (FEG), business licences
-and the Bluebook target villages (with the DPG villages of the BRG atlas among them), crossed with peat, burned area and
+the Bluebook target villages and the DPG villages of the BRG atlas, crossed with peat, burned area and
 this year's hotspots.
 
   repeat-national-overlay --config configs/examples/national_stage3.yaml
@@ -230,6 +230,8 @@ def one(cfg, kid, name, g):
     lic_m = to_aea(lic.geometry.values) if len(lic) else np.array([])
     vil = _read(data / inp["villages"], g, ["OBJECTID", "DESA_2023", "KEC_2023", "KABKO_2023"])
     vil["dmpg"] = vil["OBJECTID"].isin(P.dmpg_ids(data / inp["dmpg"])) if inp.get("dmpg") else False
+    dpg = (_read(data / inp["dmpg"], g, ["desa", "kecamatan", "target_objectid"]) if inp.get("dmpg") and (data / inp["dmpg"]).exists()
+           else vil.iloc[:0])
 
     rows, report, pcs = [], {}, {}
     for layer, df, col, order, labels in (("forest", kws, "cls", KWS_ORDER, KWS_LABEL), ("feg", feg, "cls", FEG_ORDER, FEG_LABEL)):
@@ -283,10 +285,10 @@ def one(cfg, kid, name, g):
             hv[gpd.sjoin(hs[["geometry"]], vil[["geometry"]], how="inner", predicate="within").index.unique()] = True
     rows += _stats("village", pd.Series(np.where(pv, "in", "out"), index=pts.index), ["in"], {"in": "Target village"}, pts,
                    pd.DataFrame({"cls": np.where(hv, "in", "out"), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
-    # DPG villages of the BRG atlas (a subset of the target villages): context, not scored
+    # DPG villages of the BRG atlas (KLH 2023 / BIG 2026 boundaries; most are target villages too): context, not scored
     pd_ = pd.Series(False, index=pts.index)
     hd = pd.Series(False, index=hs.index)
-    dv = vil[vil["dmpg"]] if len(vil) else vil
+    dv = dpg
     if len(dv):
         pd_[gpd.sjoin(pts[["geometry"]], dv[["geometry"]], how="inner", predicate="within").index.unique()] = True
         if len(hs):
@@ -359,6 +361,11 @@ def one(cfg, kid, name, g):
             if not geom.is_empty:
                 mp["village"].append({"n": f'{vil["DESA_2023"].iloc[k]}, {vil["KEC_2023"].iloc[k]}', "r": _rings(geom, tol),
                                       **({"d": 1} if vil["dmpg"].iloc[k] else {})})
+    extra = dpg[dpg["target_objectid"].isna()] if len(dpg) else dpg     # DPG villages outside the target villages: x = 1
+    if len(extra):
+        for k, geom in enumerate(cl(extra.geometry.values)):
+            if not geom.is_empty:
+                mp["village"].append({"n": f'{extra["desa"].iloc[k]}, {extra["kecamatan"].iloc[k]}', "r": _rings(geom, tol), "d": 1, "x": 1})
     mp["cell_m"] = cell
     return rows, actors, mp
 

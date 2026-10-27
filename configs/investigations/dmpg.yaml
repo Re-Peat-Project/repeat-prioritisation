@@ -1,15 +1,15 @@
 # Do Desa Peduli Gambut villages burn less? Question from the World Bank (2026-10); KLH stated in a meeting that 99% of
 # DMPG villages had no fire.
 #   python -m investigations.dmpg --config configs/investigations/dmpg.yaml
-# Inputs: python -m repeat_common.fetch_dpg_atlas (atlas villages matched to the target villages), fetch_peat_extent.
+# Inputs: python -m repeat_common.fetch_dpg_atlas, then fetch_dpg_boundaries (village boundaries), and fetch_peat_extent.
 # Environment: REPEAT_DATA, REPEAT_WORK, REPEAT_HUB.
 data: ${REPEAT_DATA}
 out: ${REPEAT_WORK}/investigations/dmpg
 registry: ${REPEAT_HUB}/sites/khg_registry.csv
 inputs:
   khg: batas_khg_indonesia.gpkg
-  villages: desa_target_pemulihan_ekosistem_gambut.gpkg   # 2,004 Bluebook 2026 target villages: the DPG villages and their controls
-  dpg: dpg/dpg_atlas_villages.csv                          # BRG atlas DPG villages, target_objectid = matched polygon
+  villages: desa_target_pemulihan_ekosistem_gambut.gpkg   # 2,004 Bluebook 2026 target villages: the controls, and most DPG villages
+  dpg: dpg/dpg_villages_boundaries.gpkg                     # BRG atlas DPG villages with KLH 2023 / BIG 2026 boundaries; target_objectid when also a target village
   burned: burnt_area_2015_2026_Indonesia.gpkg
   hotspots: hotspot_viirs_snpp_2012_2025.gpkg
   hotspots_now: _data_hotspot_Januari_September_2026.gpkg
