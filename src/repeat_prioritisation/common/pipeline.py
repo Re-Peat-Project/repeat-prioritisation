@@ -44,7 +44,7 @@ DEFAULTS = {
                 "concessions": {"path": None, "type_field": None, "exclude_types": ["IUP"]},
                 "tma_csv": None},     # older input: CSV with station_id, date, wtd_m, lon, lat (use tma.path)
     "tma": copy.deepcopy(TMA.TMA_DEFAULTS),   # water table: path = SiTMAT folder (sitmat_out/processed) or CSV
-    "rasters": {"peat_depth": None, "dtm": None},   # dtm: dtm_smooth.tif from demnas-corrections (repeat-dem)
+    "rasters": {"peat_depth": None, "dtm": None},   # dtm: dtm_smooth.tif from repeat-dem
     "extra_indicators": [],           # CSV / vector files with a unit_id column and indicator columns (u_*, i_*, f_*)
     "params": {"peat_depth_scale": 1.0,     # multiplier that turns the peat depth raster into metres (0.01 if it is in cm)
                "l_inf_m": 200, "l_inf_burnt_m": 60, "water_min_months": 10, "exposure_m": 2000,

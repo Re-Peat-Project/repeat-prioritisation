@@ -25,10 +25,12 @@ src/repeat_prioritisation/
   investigations/ one-off reports (airport, DMPG)
 configs/         example configs (national, subkhg), smoke-test configs (configs/smoke/); your own go in configs/local/.
                  Real-site configs are in the hub: re-peat/sites/<khg>/
-docs/            subkhg-method.md (the method), figures/, data_sources.md, prior_method.md (the team's earlier rank-sum)
+docs/            subkhg-method.md (the method), figures/, data_sources.md, prior_method.md (the team's earlier rank-sum),
+                 process/ (pages of repeat-subkhg-dashboard), reports/
 scripts/         one-question tools behind the numbers in the docs (see scripts/README.md), validate_subkhg.py
 tests/           pytest; tests/fixtures/: small inputs and a prefetched 2021 cache
-(neraca air is the repeat-neraca package; its sub-KHG table joins here through extra_indicators)
+legacy/          zip of the flat layout before packaging (2026-10-26); not run
+(neraca air is the repeat-neraca package; its sub-KHG table neraca_balance_unit.csv joins here through extra_indicators)
 ```
 
 How the pieces connect:
@@ -57,6 +59,8 @@ It is the Python alternative to a GEE workflow: layers are read from cloud-nativ
 ## Investigations
 
 `python -m repeat_prioritisation.investigations.airport --config configs/investigations/banjarbaru.yaml` writes a one-page report on fire near an airport and the KHG around it (runway against the KHG, peat from three sources, hotspots and burned area split into peat soil, mineral soil and outside the KHG, and the airport's METAR visibility, smoke and wind). Output: `${REPEAT_WORK}/investigations/banjarbaru.html`; `--reassemble` reuses the data. Inputs come from `repeat_common.fetch_klhk_peat`, `fetch_peat_extent --extra` and `fetch_metar`.
+
+`python -m repeat_prioritisation.investigations.dmpg --config configs/investigations/dmpg.yaml` compares the fire record of the Desa Peduli Gambut villages with comparable villages in the same KHG. Output: `${REPEAT_WORK}/investigations/dmpg/` (`dmpg.html`, tables, figures, `report.md`); `--reuse` reads `unit_year.csv` instead of measuring fire again.
 
 ## Sub-KHG program
 
@@ -115,7 +119,7 @@ In the national run the indicator groups are urgency (`u_`), impact (`i_`) and f
 | `i_forest` | Share of remaining forest / mangrove | ESA WorldCover | ↑ |
 | `f_reach` | Share within canal influence distance (200 m; 60 m on burnt peat) | canals + burned area | ↑ feasible |
 | `f_water_dist` | Mean distance to dry-season water (JRC seasonality ≥ 10 months, RBI rivers/lakes) | JRC GSW + your vectors | ↓ feasible |
-| `f_lift` | Median height above the nearest water source (pumping lift proxy) | `dtm_smooth.tif` from the `demnas-corrections` repository | ↓ feasible |
+| `f_lift` | Median height above the nearest water source (pumping lift proxy) | `dtm_smooth.tif` from repeat-dem | ↓ feasible |
 | `f_access` | Mean distance to roads | your vector | ↓ feasible |
 | `v_burned_frac`, `v_hotspot` | Burned share and hotspot density in **validation** years | same sources | targets only |
 
@@ -190,7 +194,7 @@ vectors:
   blocks: data/sekat_kanal_existing.gpkg    # for metrik IPG
   tidal: data/zona_pasang_surut.gpkg
   concessions: {path: data/konsesi_iup.gpkg, type_field: jenis, exclude_types: [IUP]}
-tma: {path: ../sitmat-extract/sitmat_out/processed}     # water table, see "Water table (TMA)" below
+tma: {path: ../repeat-sitmat/sitmat_out/processed}     # water table, see "Water table (TMA)" below
 rasters:
   peat_depth: data/kedalaman_gambut.tif
   dtm: out_dtm/dtm_smooth.tif
@@ -202,12 +206,12 @@ For the operational ranking (rather than validation), set `baseline` to include 
 
 `repeat_common.tma` turns the input into one table (`station_id, date, depth_m, lon, lat`, depth positive below the surface), and `indicators.py` only reads that table. `tma.path` picks the format:
 
-- **A folder: SiTMAT extract** (the `sitmat_out/processed/` folder of the sitmat-extract project: `daily_long.csv` + `stations.csv`, and `stations_geo.csv` if present). `water_level_cm` is negative below the surface, so `depth_m = -cm / 100`.
+- **A folder: SiTMAT extract** (the `sitmat_out/processed/` folder of repeat-sitmat: `daily_long.csv` + `stations.csv`, and `stations_geo.csv` if present). `water_level_cm` is negative below the surface, so `depth_m = -cm / 100`.
 - **A file: CSV** with `station_id, date, wtd_m, lon, lat`. Set `params.tma_depth_positive` to say how the sign works. Left unset, the absolute value is used and a warning is logged, which counts flooded readings as deep.
 
 ```yaml
 tma:
-  path: ../sitmat-extract/sitmat_out/processed
+  path: ../repeat-sitmat/sitmat_out/processed
   kinds: [concession]            # add "community": low coverage, many flagged values
   drop_flags: [range, spike]     # QC flags from the extract
   min_coverage: 0.5              # valid readings on at least this share of the days in the period
@@ -218,7 +222,7 @@ tma:
 - SiTMAT covers one season (2026-04 to 2026-10 at the time of writing), after the validation year. Treat `u_tma` as the current state of the water table, not a baseline-year indicator; the held-out validation does not test it.
 - A reading counts as exceeding when the water table is deeper than `params.tma_threshold_m` (0.4 m). The portal's own status class `ORANYE` also includes readings of exactly −40 cm (about 6% of readings), so its shares of days below −40 cm are higher than `u_tma`.
 - Stations are assigned to a unit by location. Most units have none: SiTMAT stations are mostly inside concessions, so coverage is uneven. Units without a station get no `u_tma`; `n_tma_stations` and the log show the coverage. An indicator available for fewer than 20 units is reported but not scored.
-- The concession data has no rainfall or soil moisture. Rainfall for a water balance comes from ERA5 (see docs/data_sources.md).
+- The concession data has no rainfall or soil moisture. The sub-KHG water balance comes from repeat-neraca: list its `runs/balance/neraca_balance_unit.csv` in `extra_indicators`, and its `neraca_khg.csv` in `priority_export.neraca_khg` for the deficit in `subkhg_priority.csv`.
 
 ### Using your own layers instead of the cloud
 
@@ -253,6 +257,8 @@ the commands, the settings and why each was chosen. Its configs use `${REPEAT_DA
 outside the repo: `${NAME}` in any config value is replaced by the environment variable, and a missing variable stops with a
 message. Every analysis behind a number in the docs is a command in the repo (see `scripts/README.md`), not a throwaway.
 
+The KHG chain runner in the hub (`re-peat/tools/khg_pipeline.py`, `re-peat/pipeline.yaml`) writes the sub-KHG config per DEM and runs `python -m repeat_prioritisation.subkhg.run` into `_khg/<code>_<name>/04_prioritisation/<dem>/` (one folder per DEM variant since 2026-10-27).
+
 ### Smoke tests
 
 Each program runs on its own on the small inputs in `tests/fixtures/`. Outputs go to `var/out/smoke/`, which git ignores.
@@ -262,9 +268,9 @@ repeat-subkhg --config configs/smoke/subkhg.yaml --skip-fetch                # 4
 repeat-national-run --config configs/smoke/national.yaml                         # 3 small KHG, fetches the 2021 layers, ~2 min
 ```
 
-All three ran on 2026-10-15. The sub-KHG smoke test has no canals, peat depth or roads, so only a few indicators are scored: it checks that the pipeline runs, not that the ranking is right.
+Both ran on 2026-10-15. The sub-KHG smoke test has no canals, peat depth or roads, so only a few indicators are scored: it checks that the pipeline runs, not that the ranking is right.
 
-## Outputs (`out/`)
+## Outputs (`out`, default `var/out/`)
 
 Both programs write the same set of files, with the ranking columns of their own scoring.
 
@@ -272,6 +278,7 @@ Both programs write the same set of files, with the ranking columns of their own
 |---|---|
 | `unit_prioritas.gpkg` / `.csv` | Every unit: raw indicators, normalised `n_*`, group scores, `skor_risiko`, `kelas`, `peringkat`, sensitivity fields, validation targets. In the sub-KHG program `skor_risiko` is the need score and `kelas` the need class. |
 | `khg_terpilih.gpkg` | National run: top KHG (`scoring.top_n`) |
+| `subkhg_priority.csv` | Sub-KHG run: `unit_id, priority_rank, deficit_mm, design_period_days`, the table repeat-pump reads (`priority_export:` sets the neraca deficit file and design period) |
 | `kebutuhan_sekat.csv` | Sub-KHG run: blocks needed, existing and additional per KHG and class (first cost estimate) |
 | `peta_prioritas_<khg>.png` | Urgency, impact, feasibility and class maps per KHG |
 | `ringkasan_kelas.csv` | Units and km² per class per KHG |
@@ -281,6 +288,6 @@ Both programs write the same set of files, with the ranking columns of their own
 ## Status of the code
 
 - **Tested on synthetic data**: six KHG in the national run (ranking followed the built-in risk intensity) and sub-KHG delineation, IPG, tidal and concession handling in the sub-KHG run (12 and 11 sub-KHG per KHG, bounded by divides and primary canals; see `contoh_subkhg_sintetis.png`). The sub-KHG need ranking has only run on synthetic indicator tables. Delineation was also tested on the Pulau Padang LiDAR DTM. With a known fire-risk field, the top 20% of units captured 64% of held-out burned area (random would be 20%). Urgency alone reached AUC 0.79, above fire history alone at 0.77.
-- **Live fetch test (one small KHG, year 2021):** Sentinel-2 NDMI, MODIS burned area, TerraClimate, WorldCover, JRC water and FIRMS work. CHIRPS failed with HTTP 403, so rainfall now comes from ERA5 (note in docs/data_sources.md). TerraClimate on Planetary Computer ends in 2021, so 2022–2023 have no deficit. Details, fixes and other providers: [docs/data_sources.md](docs/data_sources.md). Every source fails independently, logs why, and can be replaced by a local file.
+- **Live fetch test (one small KHG, year 2021):** Sentinel-2 NDMI, MODIS burned area, TerraClimate, WorldCover, JRC water and FIRMS work. CHIRPS failed with HTTP 403, so the example configs take rainfall from ERA5 (note in docs/data_sources.md). The sub-KHG preset (`subkhg/run.py`) turns ERA5 off; its rain indicators then have weight 0. TerraClimate on Planetary Computer ends in 2021, so 2022–2023 have no deficit. Details, fixes and other providers: [docs/data_sources.md](docs/data_sources.md). Every source fails independently, logs why, and can be replaced by a local file.
 - **Coarse climate layers.** TerraClimate (~4 km) and ERA5 (~25 km) are much coarser than 1 km² units. They separate KHG and large zones, not neighbouring hexagons. Fine-scale contrast comes from NDMI, fire, canals and peat depth.
 - **FIRMS country files** are large; for many runs, download them once and point `sources.firms.local` at the file.
