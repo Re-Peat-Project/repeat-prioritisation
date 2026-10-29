@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fire, wetness and the licence edge</title>
+<style>/*MAPLIBRE_CSS*/</style>
+<style>
+:root{color-scheme:light;
+  --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#767570;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);--wash:rgba(42,120,214,.08);
+  --foot:#2a78d6;--slope:#eb6834;--crest:#1baf7a;--tree:#008300;--open:#6250d6;--hi:#eb6834;--lo:#2a78d6;--none:#767570;--shadow:0 4px 18px rgba(0,0,0,.14)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#a09f98;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--wash:rgba(57,135,229,.14);
+  --foot:#3987e5;--slope:#d95926;--crest:#199e70;--tree:#2fa02f;--open:#9085e9;--hi:#d95926;--lo:#3987e5;--none:#a09f98;--shadow:0 4px 18px rgba(0,0,0,.5)}}
+:root[data-theme=dark]{color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#a09f98;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);--wash:rgba(57,135,229,.14);
+  --foot:#3987e5;--slope:#d95926;--crest:#199e70;--tree:#2fa02f;--open:#9085e9;--hi:#d95926;--lo:#3987e5;--none:#a09f98;--shadow:0 4px 18px rgba(0,0,0,.5)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+h1{font-size:22px;line-height:1.2;margin:0}
+h2{font-size:15px;font-weight:600;margin:0}
+h3{font-size:13px;font-weight:600;margin:0}
+.wrap{max-width:1360px;margin:0 auto;padding:0 20px}
+header.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:18px 0 8px}
+.sub{margin:3px 0 0;color:var(--ink2);font-size:13px;max-width:70ch}
+button,select{font:inherit;color:var(--ink)}
+button{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 12px;cursor:pointer}
+button:hover{border-color:var(--foot)}
+select{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 8px;max-width:320px}
+.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--page) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--border)}
+.bar .wrap{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;padding-top:8px;padding-bottom:8px}
+.ctl{display:flex;align-items:center;gap:8px}
+.lab{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.seg{flex-wrap:wrap}.seg button{border:0;border-radius:0;padding:3px 10px;background:transparent;font-size:13px}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.seg button[disabled]{opacity:.4;cursor:not-allowed}
+section{margin:22px 0 0}
+section>.hd{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+section>.hd p{margin:0;color:var(--ink2);font-size:13px}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(420px,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;min-width:0}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.tile{display:flex;flex-direction:column;gap:4px}
+.tile .claim{color:var(--ink2);font-size:13px;min-height:2.9em}
+.tile .big{font-size:30px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .what{color:var(--ink2);font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--axis);border-radius:999px;padding:1px 10px;font-size:12px;width:max-content;margin-top:auto}
+.i{display:inline-block;width:14px;text-align:center;font-weight:700}
+.h{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--axis);color:var(--muted);font-size:10px;cursor:help;margin-left:4px;vertical-align:1px}
+svg{display:block;width:100%;overflow:visible}
+svg text{fill:var(--ink2);font-size:11px;font-family:inherit}
+svg .ink{fill:var(--ink)}
+svg .gridl{stroke:var(--grid);stroke-width:1}
+svg .axl{stroke:var(--axis);stroke-width:1}
+svg .ref{stroke:var(--ink2);stroke-width:1;stroke-dasharray:3 3}
+.row-hit{cursor:pointer}
+.row-hit:hover rect.bg,.row-hit.sel rect.bg{fill:var(--wash)}
+#map{height:520px;border-radius:8px;overflow:hidden;border:1px solid var(--border);position:relative}
+.maplibregl-ctrl-attrib{font-size:10px}
+#cellinfo{position:absolute;right:8px;top:8px;z-index:3;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12px;max-width:230px;pointer-events:none;box-shadow:var(--shadow)}
+#cellinfo b{font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:12px;color:var(--ink2)}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-2px;border:1px solid var(--border)}
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 9px;font-size:12px;box-shadow:var(--shadow);max-width:300px;display:none}
+.tip b{font-weight:600}.tip .m{color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}
+td.wrap2{white-space:normal}
+th{font-weight:600;color:var(--ink2);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--surface)}
+th .arr{color:var(--muted);font-size:10px;margin-left:3px}
+tbody tr:hover{background:var(--wash)}
+tbody tr.sel{background:var(--wash)}
+.scroll{overflow:auto;max-height:420px}
+input[type=search]{background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:4px 8px;font:inherit}
+details{margin-top:6px;font-size:12.5px;color:var(--ink2)}
+summary{cursor:pointer;color:var(--muted)}
+.note{color:var(--ink2);font-size:12.5px;margin:6px 0 0}
+footer{margin:28px 0 40px;color:var(--muted);font-size:12px}
+@media (max-width:760px){.g2{grid-template-columns:1fr}#map{height:380px}}
+</style>
+</head>
+<body>
+<div class="tip" id="tip"></div>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Fire, wetness and the licence edge</h1>
+    <p class="sub">Is land beside licence areas drier or more burnt than land inside them? Every result is an association by position on the dome, not a statement about who is responsible.</p>
+  </div>
+  <div style="display:flex;gap:8px"><span class="seg" id="lang"><button data-v="en" class="on">EN</button><button data-v="id">ID</button></span><button id="theme" aria-label="Toggle light and dark">◐ Theme</button></div>
+</header>
+</div>
+<div class="bar"><div class="wrap">
+  <div class="ctl"><span class="lab">Hotspots</span><span class="seg" id="c-conf"><button data-v="all" class="on">Nominal + high</button><button data-v="high">High only</button></span></div>
+  <div class="ctl"><span class="lab">Canal distance</span><span class="seg" id="c-canal"><button data-v="all" class="on">All</button><button data-v="canal < 1 km">&lt; 1 km</button><button data-v="canal >= 1 km">≥ 1 km</button></span></div>
+  <div class="ctl"><span class="lab">KHG</span><select id="c-khg"></select></div>
+</div></div>
+<div class="wrap">
+
+<section id="s-claims">
+  <div class="hd"><h2>Four ideas, four tests</h2><span class="h" data-tip="Each tile counts KHG in this page's data. The numbers follow the hotspot-confidence switch above.">?</span></div>
+  <div class="grid g4" id="tiles"></div>
+</section>
+
+<section id="s-fire">
+  <div class="hd"><h2>Fire per peat area, 0–2 km outside the licence edge over 0–2 km inside</h2>
+    <span class="h" data-tip="Ratio of VIIRS hotspots per km² of peat (2012–2025), 0–2 km outside the 2025 licence edge over 0–2 km inside. Interval: 1,000 resamples of 5 km blocks. A dot is filled when the interval excludes 1. Click a row to open that KHG below.">?</span></div>
+  <div class="card"><div id="forest"></div>
+    <details><summary>Table</summary><div id="forest-tbl" class="scroll"></div></details></div>
+</section>
+
+<section id="s-detail">
+  <div class="hd"><h2 id="d-title">One KHG</h2><p id="d-sub"></p></div>
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><span class="seg" id="c-layer"></span><span class="seg" id="c-cov" style="display:none"><button data-v="1" class="on">Tree cover</button><button data-v="2">Open</button></span></div>
+      <div id="map"><div id="cellinfo">Move over the map</div></div>
+      <div class="legend" id="legend"></div>
+      <p class="note" id="map-note"></p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <div class="card" style="flex:1">
+        <div class="card-h"><h3>Hotspots per 100 km² of peat and year, by distance to the licence edge<span class="h" data-tip="Per 200 m peat cell, signed distance to the edge of the 2025 licence layer (negative inside). Position = height above the nearest river in thirds of the KHG's peat. 'Dry years' = 2015, 2019, 2023 only (not offered for high confidence).">?</span></h3>
+          <span class="seg" id="c-dry"><button data-v="0" class="on">2012–2025</button><button data-v="1">Dry years</button></span></div>
+        <div id="bandchart"></div>
+        <details><summary>Table</summary><div id="band-tbl" class="scroll"></div></details>
+      </div>
+      <div class="card" style="flex:1">
+        <div class="card-h"><h3>Hotspots per 100 km² of peat, by year and zone<span class="h" data-tip="All dome positions. Shaded: the strong dry-season years 2015, 2019 and 2023.">?</span></h3></div>
+        <div id="yearchart"></div>
+        <details><summary>Table</summary><div id="year-tbl" class="scroll"></div></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="s-wet">
+  <div class="hd"><h2>Wetness beside the licence edge</h2>
+    <span class="h" data-tip="Three independent looks. The groundwater model holds licence land at 0.4 m (an assumption), so it shows how far that could reach, not whether it happens. Sentinel-1 backscatter is a moisture signal, not a water table.">?</span></div>
+  <div class="grid g2">
+    <div class="card">
+      <div class="card-h"><h3>Groundwater model: open land when licence land is held at 0.4 m<span class="h" data-tip="repeat-neraca-model, LiDAR DTM, June–September 2026 (122 days). Change = days deeper than 40 cm with licence land held at 0.4 m minus the same run without a managed target, open land only. The only link between licence and open land is groundwater flow between cells and canal cells; canal routing and outflow control are not modelled.">?</span></h3></div>
+      <div id="modelchart"></div>
+      <p class="note" id="model-note"></p>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Sentinel-1 wet-to-dry change, outside minus inside (dB)<span class="h" data-tip="COPERNICUS/S1_GRD, IW, ascending orbit, monthly mean in linear power, averaged onto the 200 m grid in Earth Engine. Wet = April–May, dry = July–September 2026. Compared inside one ESA WorldCover class (tree: tree share ≥ 0.8; open: tree share < 0.3). Positive: backscatter fell less outside. Interval: 5 km block resampling.">?</span></h3>
+        <span class="seg" id="c-pol"><button data-v="VV" class="on">VV</button><button data-v="VH">VH</button></span></div>
+      <div id="s1chart"></div>
+      <p class="note">C-band is weak under dense canopy and for a deep water table. Tree and open cover inside and outside a licence can be different kinds of stand, so equal class does not mean comparable land.</p>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-h"><h3>SiTMAT water-level readings per 1 cm bin<span class="h" data-tip="Unflagged daily values between −300 and +50 cm from the SiTMAT portal (negative below the surface). Share of each station group's readings per 1 cm bin, per mille. Source file: concession_levels.csv, written by check_concession_levels.py.">?</span></h3></div>
+    <div id="sitchart"></div><p class="note" id="sit-note"></p>
+  </div>
+</section>
+
+<section id="s-rules">
+  <div class="hd"><h2>Rules and monitoring</h2><p>Read from the published texts.</p></div>
+  <div class="card"><table id="rules"></table></div>
+</section>
+
+<section id="s-table">
+  <div class="hd"><h2>All KHG</h2><input type="search" id="q" placeholder="Search KHG"></div>
+  <div class="card"><div class="scroll"><table id="ktbl"></table></div></div>
+</section>
+
+<section id="s-src">
+  <div class="hd"><h2>Sources and method</h2></div>
+  <div class="card"><div class="scroll"><table id="src"></table></div></div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>/*D3*/</script>
+<script>/*MAPLIBRE_JS*/</script>
+<script>/*DATA*/</script>
+<script>/*ID*/</script>
+<script>/*APP*/</script>
+</body>
+</html>
