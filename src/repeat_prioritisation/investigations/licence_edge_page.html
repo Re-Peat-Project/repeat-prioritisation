@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fire, wetness and the licence edge</title>
+<title>Do licence areas burn less?</title>
 <style>/*MAPLIBRE_CSS*/</style>
 <style>
 :root{color-scheme:light;
@@ -82,6 +82,24 @@ details{margin-top:6px;font-size:12.5px;color:var(--ink2)}
 summary{cursor:pointer;color:var(--muted)}
 .note{color:var(--ink2);font-size:12.5px;margin:6px 0 0}
 footer{margin:28px 0 40px;color:var(--muted);font-size:12px}
+.hero{padding:18px 20px}
+.hero h2{font-size:24px;line-height:1.2;margin:0 0 4px;font-weight:700}
+.hero p{margin:0;color:var(--ink2);font-size:14px;max-width:75ch}
+.cnt{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0 4px}
+.cnt button{display:flex;align-items:baseline;gap:10px;text-align:left;border:1px solid var(--border);border-left:5px solid var(--c);border-radius:10px;padding:8px 16px 8px 12px;background:var(--surface)}
+.cnt button.on{background:var(--wash);border-color:var(--c)}
+.cnt .n{font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.cnt .l{font-size:13px;color:var(--ink2);max-width:15ch;line-height:1.25}
+.key{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:10px;font-size:12.5px;color:var(--ink2)}
+.key i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:3px;margin-right:6px}
+.sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+.pn{cursor:pointer;padding:10px 10px 6px;transition:border-color .15s}
+.pn:hover,.pn.sel{border-color:var(--ink2)}
+.pn-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.pn-h b{font-size:13px}
+.pill{font-size:11px;border:1px solid var(--c);color:var(--ink);border-radius:999px;padding:0 8px;white-space:nowrap;background:color-mix(in srgb,var(--c) 14%,transparent)}
+.pn-sub{font-size:12px;color:var(--ink2);margin:2px 0 2px;min-height:1.4em}
+.empty{color:var(--muted);font-size:12px;padding:30px 0;text-align:center}
 @media (max-width:760px){.g2{grid-template-columns:1fr}#map{height:380px}}
 </style>
 </head>
@@ -90,91 +108,60 @@ footer{margin:28px 0 40px;color:var(--muted);font-size:12px}
 <div class="wrap">
 <header class="top">
   <div>
-    <h1>Fire, wetness and the licence edge</h1>
-    <p class="sub">Is land beside licence areas drier or more burnt than land inside them? Every result is an association by position on the dome, not a statement about who is responsible.</p>
+    <h1>Do licence areas burn less?</h1>
+    <p class="sub">Fire on peat just inside and just outside the edge of licence areas, 2012–2025. A comparison of position, not of responsibility.</p>
   </div>
   <div style="display:flex;gap:8px"><span class="seg" id="lang"><button data-v="en" class="on">EN</button><button data-v="id">ID</button></span><button id="theme" aria-label="Toggle light and dark">◐ Theme</button></div>
 </header>
+
+<section class="card hero" id="verdict"></section>
 </div>
+
 <div class="bar"><div class="wrap">
-  <div class="ctl"><span class="lab">Hotspots</span><span class="seg" id="c-conf"><button data-v="all" class="on">Nominal + high</button><button data-v="high">High only</button></span></div>
-  <div class="ctl"><span class="lab">Canal distance</span><span class="seg" id="c-canal"><button data-v="all" class="on">All</button><button data-v="canal < 1 km">&lt; 1 km</button><button data-v="canal >= 1 km">≥ 1 km</button></span></div>
-  <div class="ctl"><span class="lab">KHG</span><select id="c-khg"></select></div>
+  <div class="ctl"><span class="lab">Fire detections</span><span class="seg" id="c-conf"><button data-v="all" class="on">Nominal + high</button><button data-v="high">High only</button></span></div>
+  <div class="ctl"><span class="lab">Where on the dome</span><span class="seg" id="c-pos"><button data-v="all" class="on">Everywhere</button><button data-v="foot">Foot</button><button data-v="slope">Slope</button><button data-v="crest">Crest</button></span></div>
+  <div class="ctl"><span class="lab">Show</span><span class="seg" id="c-view"><button data-v="band" class="on">By distance</button><button data-v="year">By year</button></span></div>
+  <div class="ctl"><span class="lab">Scale</span><span class="seg" id="c-scale"><button data-v="own" class="on">Own per panel</button><button data-v="same">Same for all</button></span></div>
 </div></div>
+
 <div class="wrap">
-
-<section id="s-claims">
-  <div class="hd"><h2>Four ideas, four tests</h2><span class="h" data-tip="Each tile counts KHG in this page's data. The numbers follow the hotspot-confidence switch above.">?</span></div>
-  <div class="grid g4" id="tiles"></div>
-</section>
-
-<section id="s-fire">
-  <div class="hd"><h2>Fire per peat area, 0–2 km outside the licence edge over 0–2 km inside</h2>
-    <span class="h" data-tip="Ratio of VIIRS hotspots per km² of peat (2012–2025), 0–2 km outside the 2025 licence edge over 0–2 km inside. Interval: 1,000 resamples of 5 km blocks. A dot is filled when the interval excludes 1. Click a row to open that KHG below.">?</span></div>
-  <div class="card"><div id="forest"></div>
-    <details><summary>Table</summary><div id="forest-tbl" class="scroll"></div></details></div>
+<section id="s-sm">
+  <div class="hd"><h2>One panel per peat area (KHG)</h2><p id="sm-sub"></p></div>
+  <div class="sm" id="sm"></div>
+  <p class="note" id="sm-note"></p>
 </section>
 
 <section id="s-detail">
   <div class="hd"><h2 id="d-title">One KHG</h2><p id="d-sub"></p></div>
   <div class="grid g2">
     <div class="card">
-      <div class="card-h"><span class="seg" id="c-layer"></span><span class="seg" id="c-cov" style="display:none"><button data-v="1" class="on">Tree cover</button><button data-v="2">Open</button></span></div>
+      <div class="card-h"><span class="seg" id="c-layer"></span></div>
       <div id="map"><div id="cellinfo">Move over the map</div></div>
       <div class="legend" id="legend"></div>
       <p class="note" id="map-note"></p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-      <div class="card" style="flex:1">
-        <div class="card-h"><h3>Hotspots per 100 km² of peat and year, by distance to the licence edge<span class="h" data-tip="Per 200 m peat cell, signed distance to the edge of the 2025 licence layer (negative inside). Position = height above the nearest river in thirds of the KHG's peat. 'Dry years' = 2015, 2019, 2023 only (not offered for high confidence).">?</span></h3>
-          <span class="seg" id="c-dry"><button data-v="0" class="on">2012–2025</button><button data-v="1">Dry years</button></span></div>
+      <div class="card">
+        <div class="card-h"><h3>Fire by distance to the licence edge, by dome position<span class="h" data-tip="Hotspots per 100 km² of peat and year, in each distance band. Dome position = height above the nearest river, in thirds of the KHG's peat.">?</span></h3></div>
         <div id="bandchart"></div>
-        <details><summary>Table</summary><div id="band-tbl" class="scroll"></div></details>
       </div>
-      <div class="card" style="flex:1">
-        <div class="card-h"><h3>Hotspots per 100 km² of peat, by year and zone<span class="h" data-tip="All dome positions. Shaded: the strong dry-season years 2015, 2019 and 2023.">?</span></h3></div>
-        <div id="yearchart"></div>
-        <details><summary>Table</summary><div id="year-tbl" class="scroll"></div></details>
+      <div class="card">
+        <div class="card-h"><h3>The numbers behind the comparison<span class="h" data-tip="0–2 km on each side of the licence edge, peat cells only. Per 100 km² of peat and year = hotspots ÷ peat area ÷ 14 years × 100.">?</span></h3></div>
+        <div id="nums"></div>
       </div>
     </div>
   </div>
-</section>
-
-<section id="s-wet">
-  <div class="hd"><h2>Wetness beside the licence edge</h2>
-    <span class="h" data-tip="Three independent looks. The groundwater model holds licence land at 0.4 m (an assumption), so it shows how far that could reach, not whether it happens. Sentinel-1 backscatter is a moisture signal, not a water table.">?</span></div>
-  <div class="grid g2">
-    <div class="card">
-      <div class="card-h"><h3>Groundwater model: open land when licence land is held at 0.4 m<span class="h" data-tip="repeat-neraca-model, LiDAR DTM, June–September 2026 (122 days). Change = days deeper than 40 cm with licence land held at 0.4 m minus the same run without a managed target, open land only. The only link between licence and open land is groundwater flow between cells and canal cells; canal routing and outflow control are not modelled.">?</span></h3></div>
-      <div id="modelchart"></div>
-      <p class="note" id="model-note"></p>
-    </div>
-    <div class="card">
-      <div class="card-h"><h3>Sentinel-1 wet-to-dry change, outside minus inside (dB)<span class="h" data-tip="COPERNICUS/S1_GRD, IW, ascending orbit, monthly mean in linear power, averaged onto the 200 m grid in Earth Engine. Wet = April–May, dry = July–September 2026. Compared inside one ESA WorldCover class (tree: tree share ≥ 0.8; open: tree share < 0.3). Positive: backscatter fell less outside. Interval: 5 km block resampling.">?</span></h3>
-        <span class="seg" id="c-pol"><button data-v="VV" class="on">VV</button><button data-v="VH">VH</button></span></div>
-      <div id="s1chart"></div>
-      <p class="note">C-band is weak under dense canopy and for a deep water table. Tree and open cover inside and outside a licence can be different kinds of stand, so equal class does not mean comparable land.</p>
-    </div>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div class="card-h"><h3>SiTMAT water-level readings per 1 cm bin<span class="h" data-tip="Unflagged daily values between −300 and +50 cm from the SiTMAT portal (negative below the surface). Share of each station group's readings per 1 cm bin, per mille. Source file: concession_levels.csv, written by check_concession_levels.py.">?</span></h3></div>
-    <div id="sitchart"></div><p class="note" id="sit-note"></p>
-  </div>
-</section>
-
-<section id="s-rules">
-  <div class="hd"><h2>Rules and monitoring</h2><p>Read from the published texts.</p></div>
-  <div class="card"><table id="rules"></table></div>
 </section>
 
 <section id="s-table">
-  <div class="hd"><h2>All KHG</h2><input type="search" id="q" placeholder="Search KHG"></div>
+  <div class="hd"><h2>All KHG</h2><input type="search" id="q" placeholder="Search KHG"><button id="csv">Download CSV</button></div>
   <div class="card"><div class="scroll"><table id="ktbl"></table></div></div>
 </section>
 
 <section id="s-src">
-  <div class="hd"><h2>Sources and method</h2></div>
+  <div class="hd"><h2>Data and how to check</h2></div>
   <div class="card"><div class="scroll"><table id="src"></table></div></div>
+  <p class="note" id="check"></p>
 </section>
 
 <footer id="foot"></footer>

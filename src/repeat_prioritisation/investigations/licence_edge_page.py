@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""One HTML page with the evidence of the licence-edge investigation: fire, groundwater model, Sentinel-1 and station levels, with maps.
+"""One HTML page with the evidence of the licence-edge investigation: fire just inside and just outside licence areas, small multiples per KHG, and a map.
 
   python -m repeat_prioritisation.investigations.licence_edge_page [--out re-peat/reports/licence_edge_investigation.html]
 
-Reads what the investigation scripts wrote, for every KHG folder that has `04_prioritisation/licence_edge/summary.json`:
-  licence_edge.py        band_position.csv, band_year.csv, edge_contrast.csv, cells.csv.gz, summary.json
-  licence_edge_model.py  model_by_band.csv and the model rasters      (KHG with a baseline and a managed-target run)
-  licence_edge_s1.py     s1_by_band.csv, s1_contrast.csv and the S1 tif (KHG with a Sentinel-1 fetch)
-  check_concession_levels.py   repeat-neraca/docs/reports/concession_levels.csv and _stats.csv
-  licence_rules.csv            re-peat/reports/investigations: what PP 71/2014, PP 57/2016 and Permen LHK P.15/2017 say (article, quote, source URL)
+Reads what licence_edge.py wrote, for every KHG folder that has `04_prioritisation/licence_edge/summary.json`:
+  band_position.csv, band_year.csv, edge_contrast.csv, cells.csv.gz, summary.json
 and writes one self-contained file (D3 and MapLibre inlined; the basemap tiles need internet). Nothing is typed in: rerun after
 more KHG have outputs. The high-confidence contrast is computed here from cells.csv.gz with the same block resampling as licence_edge.py,
 and the all-confidence contrast is checked against `_khg/licence_edge_contrast.csv`.
@@ -39,20 +35,14 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject
 
 from repeat_common import khg as K
 from repeat_prioritisation.investigations import licence_edge as LE
-from repeat_prioritisation.investigations import licence_edge_model as LM
-from repeat_prioritisation.investigations import licence_edge_s1 as LS
 
 log = logging.getLogger("licence_edge_page")
 ASSETS = Path(__file__).resolve().parents[1] / "national" / "assets"
 TEMPLATE = Path(__file__).with_name("licence_edge_page.html")
 CELL = 200.0
-S1_WET, S1_DRY = ["2026-04", "2026-05"], ["2026-07", "2026-08", "2026-09"]
 
 # class edges of the map layers (code 1 is the first class; 0 is no data)
 FIRE_EDGES = [0, 1, 3, 10, 30, 100]                  # hotspots per 100 km2 and year, 1 km blocks
-S1_EDGES = [-1.5, -0.75, -0.25, 0.25, 0.75]          # dB, dry minus wet
-CHG_EDGES = [0.5, 2, 5, 10]                          # days deeper than 40 cm
-BASE_EDGES = [1, 10, 30, 60, 90]                     # days deeper than 40 cm of 122
 
 
 def klass(v, edges):
@@ -155,7 +145,7 @@ def fire_blocks(c: pd.DataFrame, col: str, row, col_i):
     return d.b.map(g.rate).to_numpy()
 
 
-def build_map(code: str, c: pd.DataFrame, folder: Path, has_model: bool, has_s1: bool):
+def build_map(code: str, c: pd.DataFrame, folder: Path):
     c = c.reset_index(drop=True)
     hs = c[[f"hs_{y}" for y in LE.YEARS]].sum(axis=1)
     hh = c[[f"hh_{y}" for y in LE.YEARS]].sum(axis=1)
@@ -165,23 +155,6 @@ def build_map(code: str, c: pd.DataFrame, folder: Path, has_model: bool, has_s1:
     _, aff, row, col_i = grid_arrays(c, {"band": layers["band"]})
     layers["fire"] = klass(fire_blocks(c, "hs_all", row, col_i), FIRE_EDGES)
     layers["fire_h"] = klass(fire_blocks(c, "hh_all", row, col_i), FIRE_EDGES)
-    if has_s1:
-        s, tif = LS.read_cells(code, S1_WET, S1_DRY)
-        s = s.set_index(["x", "y"])
-        k = pd.MultiIndex.from_arrays([c.x, c.y])
-        vv = s.vv_d.reindex(k).to_numpy()
-        cov = s.cover.reindex(k).fillna("").to_numpy()
-        layers["s1"] = np.where(cov != "", klass(vv, S1_EDGES), 0).astype(np.uint8)
-        layers["cov"] = np.select([cov == "tree", cov == "open"], [1, 2], 0).astype(np.uint8)
-    if has_model:
-        rd = LM.runs_dir(code, "lidar")
-        base = LM.find_run(rd, None)
-        scen = LM.find_run(rd, "0.4", base.name.split("_e0.3_")[1].split("m_")[0])
-        db = LM.sample(base / "model_season_days_deeper_40cm.tif", c.x.to_numpy(), c.y.to_numpy())
-        ds = LM.sample(scen / "model_season_days_deeper_40cm.tif", c.x.to_numpy(), c.y.to_numpy())
-        both = np.isfinite(db) & np.isfinite(ds)
-        layers["mbase"] = np.where(both, klass(db, BASE_EDGES), 0).astype(np.uint8)
-        layers["mchg"] = np.where(both, klass(ds - db, CHG_EDGES), 0).astype(np.uint8)
     arrs, aff, _, _ = grid_arrays(c, layers)
     arrs, daff, dw, dh = to_mercator(arrs, aff)
     tf = Transformer.from_crs(3857, 4326, always_xy=True)
@@ -224,13 +197,11 @@ def main(argv=None):
         nm = nm.removeprefix("KHG ").replace("Sungai ", "")
         c = pd.read_csv(d / "cells.csv.gz")
         c["position"] = c["position"].fillna("")
-        has_model = (d / "model_by_band.csv").exists()
-        has_s1 = (d / "s1_contrast.csv").exists()
-        log.info("%s %s (model %s, S1 %s)", code, nm, has_model, has_s1)
+        log.info("%s %s", code, nm)
         ec_p = d / "edge_contrast.csv"
         ec = pd.read_csv(ec_p) if ec_p.stat().st_size > 5 else pd.DataFrame()
         item = {"code": code, "folder": folder.name, "name": nm, "province": prov, "peat_km2": summ["peat_km2"], "licence_peat_km2": summ["licence_peat_km2"],
-                "licences": summ["licences"], "dem": summ["dem"], "has_model": has_model, "has_s1": has_s1,
+                "licences": summ["licences"], "dem": summ["dem"],
                 "bp": records(pd.read_csv(d / "band_position.csv")),
                 "by": records(pd.read_csv(d / "band_year.csv"), ["group", "position", "year", "peat_km2", "hotspots", "high_hotspots", "burned_share"])}
         if len(ec):
@@ -245,24 +216,11 @@ def main(argv=None):
                 assert np.allclose(ref[col_].reindex(chk.index), chk[col_], equal_nan=True), f"{code}: {col_} differs from licence_edge_contrast.csv"
             item["ec"] = records(ec, ["position", "canal", "inside_km2", "outside_km2", "hotspots_inside", "hotspots_outside", "rate_ratio_out_over_in", "lo_block", "hi_block", "blocks", "reading"])
             item["ec_h"] = records(hc, ["position", "canal", "hotspots_inside", "hotspots_outside", "rate_ratio_out_over_in", "lo_block", "hi_block", "blocks", "reading"])
-        if has_model:
-            item["model"] = records(pd.read_csv(d / "model_by_band.csv"))
-        if has_s1:
-            item["s1"] = records(pd.read_csv(d / "s1_by_band.csv"))
-            item["s1c"] = records(pd.read_csv(d / "s1_contrast.csv"))
-            item["s1_pass"] = json.loads(next(iter(sorted((folder / "03_neraca" / "inputs" / "s1").glob("s1_2026-04_*.json")) or sorted((folder / "03_neraca" / "inputs" / "s1").glob("s1_*.json")))).read_text())["pass"]
-        item["map"] = build_map(code, c, folder, has_model, has_s1)
+        item["map"] = build_map(code, c, folder)
         items.append(item)
-    cl = K.WORKSPACE / "repeat-neraca" / "docs" / "reports"
-    sit = {"bins": records(pd.read_csv(cl / "concession_levels.csv")),
-           "stats": {r.metric: clean(r.value) if not isinstance(r.value, str) else r.value for r in pd.read_csv(cl / "concession_levels_stats.csv").itertuples()}}
-    rules = records(pd.read_csv(hub / "reports" / "investigations" / "licence_rules.csv").fillna(""))
     style = json.loads((ASSETS / "basemap-positron.json").read_text(encoding="utf-8"))
-    data = {"built": str(date.today()), "bands": LE.BAND_LABEL, "pos": LE.POS, "years": LE.YEARS, "dry_years": list(LE.DRY_YEARS), "khg": items, "sitmat": sit, "rules": rules,
-            "s1_wet": S1_WET, "s1_dry": S1_DRY,
-            "classes": {"fire": [label_of(i, FIRE_EDGES) for i in range(1, len(FIRE_EDGES) + 2)], "s1": [label_of(i, S1_EDGES, " dB") for i in range(1, len(S1_EDGES) + 2)],
-                        "mchg": [label_of(i, CHG_EDGES, " d") for i in range(1, len(CHG_EDGES) + 2)], "mbase": [label_of(i, BASE_EDGES, " d") for i in range(1, len(BASE_EDGES) + 2)]},
-            "style": style}
+    data = {"built": str(date.today()), "bands": LE.BAND_LABEL, "pos": LE.POS, "years": LE.YEARS, "dry_years": list(LE.DRY_YEARS), "khg": items,
+            "classes": {"fire": [label_of(i, FIRE_EDGES) for i in range(1, len(FIRE_EDGES) + 2)]}, "style": style}
     html = TEMPLATE.read_text(encoding="utf-8")
     html = html.replace("/*ID*/", TEMPLATE.with_name("licence_edge_page_id.js").read_text(encoding="utf-8")).replace("/*APP*/", TEMPLATE.with_name("licence_edge_page.js").read_text(encoding="utf-8"))
     parts = {"/*D3*/": (ASSETS / "d3.v7.9.0.min.js").read_text(encoding="utf-8"), "/*MAPLIBRE_JS*/": (ASSETS / "maplibre-gl.v5.24.0.js").read_text(encoding="utf-8"),
