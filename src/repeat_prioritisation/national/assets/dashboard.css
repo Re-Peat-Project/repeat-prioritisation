@@ -1,13 +1,13 @@
 :root{color-scheme:light;
   --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--border:rgba(11,11,11,.10);
   --hist:#2a78d6;--now:#eb6834;--canal:#1baf7a;--wash:rgba(42,120,214,.08);
-  --ramp0:#cde2fb;--ramp1:#0d366b;--peat:#a58660;--none:#e8e7e1;--icon-filter:none;--shadow:0 4px 18px rgba(0,0,0,.14)}
+  --ramp0:#cde2fb;--ramp1:#0d366b;--burn0:#6e625a;--burn1:#17120f;--peat:#a58660;--none:#e8e7e1;--icon-filter:none;--shadow:0 4px 18px rgba(0,0,0,.14)}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;
   --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
-  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}}
+  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--burn0:#a89d94;--burn1:#f3eee9;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}}
 :root[data-theme=dark]{color-scheme:dark;
   --page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;--grid:#2c2c2a;--axis:#383835;--border:rgba(255,255,255,.10);
-  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}
+  --hist:#3987e5;--now:#d95926;--canal:#199e70;--wash:rgba(57,135,229,.14);--ramp0:#184f95;--ramp1:#cde2fb;--burn0:#a89d94;--burn1:#f3eee9;--peat:#8a6d4b;--none:#262624;--icon-filter:invert(1);--shadow:0 4px 18px rgba(0,0,0,.5)}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -167,3 +167,26 @@ tbody tr:hover,tbody tr.sel{background:var(--wash)}
 #mapcard .map-tools{margin-bottom:6px}
 .map-tools .lab{margin-right:2px}
 .tgrp{display:flex;flex-basis:100%;align-items:center;gap:6px;flex-wrap:wrap}
+.zr{cursor:pointer}.zr:hover td{background:var(--wash)}
+/* ranking table: two-line headers with the unit, fixed first columns while the rest scrolls, province clipped */
+#rank-table th{white-space:normal;vertical-align:bottom;line-height:1.2;min-width:88px;max-width:120px}
+#rank-table th small{display:block;font-weight:400;font-size:10.5px;color:var(--muted)}
+#rank-table td:nth-child(3){max-width:128px;overflow:hidden;text-overflow:ellipsis}
+#rank-table th:nth-child(-n+2),#rank-table td:nth-child(-n+2){position:sticky;background:var(--surface);z-index:1}
+#rank-table th:nth-child(1),#rank-table td:nth-child(1){left:0;min-width:36px;width:36px}
+#rank-table th:nth-child(2),#rank-table td:nth-child(2){left:36px;min-width:230px;border-right:1px solid var(--grid)}
+#rank-table th:nth-child(-n+2){z-index:3}
+#rank-table th:nth-child(2),#rank-table td:nth-child(2){text-align:left}
+#rank-table tr.sel td:nth-child(-n+2),#rank-table tbody tr:hover td:nth-child(-n+2){background:linear-gradient(var(--wash),var(--wash)),var(--surface)}
+/* month range of the hotspot points: two thumbs on one track */
+.dr{position:relative;display:inline-block;width:150px;height:20px;vertical-align:middle;margin:0 8px}
+.dr::before{content:"";position:absolute;left:0;right:0;top:9px;height:3px;border-radius:2px;background:var(--grid)}
+.dr .trk{position:absolute;top:9px;height:3px;border-radius:2px;background:var(--now)}
+.dr input{position:absolute;left:0;top:0;width:100%;height:20px;margin:0;background:none;pointer-events:none;-webkit-appearance:none;appearance:none}
+.dr input::-webkit-slider-runnable-track{background:none;height:20px}
+.dr input::-moz-range-track{background:none}
+.dr input::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:all;width:14px;height:14px;margin-top:3px;border-radius:50%;background:var(--surface);border:2px solid var(--now);cursor:pointer}
+.dr input::-moz-range-thumb{pointer-events:all;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--now);cursor:pointer}
+.drl{display:inline-block;min-width:74px}
+button.ghost.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.dr input:focus{outline:none}.dr input:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--wash)}.dr input:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px var(--wash)}

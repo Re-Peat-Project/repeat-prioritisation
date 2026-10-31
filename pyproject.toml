@@ -29,7 +29,9 @@ repeat-national-profile = "repeat_prioritisation.national.profile:main"     # pr
 repeat-national-run = "repeat_prioritisation.national.run:main"             # engine run on shortlisted KHG (stage 3 layers)
 repeat-national-stage3 = "repeat_prioritisation.national.stage3:main"
 repeat-national-overlay = "repeat_prioritisation.national.overlay:main"
+repeat-national-land = "repeat_prioritisation.national.land:main"            # kawasan hutan, peat function and DMPG for all 865 KHG
 repeat-national-dashboard = "repeat_prioritisation.national.dashboard:main"
+repeat-national-tiles = "repeat_prioritisation.national.tiles:main"             # PMTiles of the dashboard map layers (tippecanoe in Docker)
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -63,7 +63,11 @@ RING_LABEL = {"lic": "In a licence", "ring": "Within 5 km of a licence", "out": 
 DEFAULT = {"overlay": {"top_actors": 8, "company_names": True, "max_licence_polygons": 120, "ring_km": 5},
            "inputs": {"forest_area": "landstatus/KWSHUTAN_AR_250K_2023_Transcripted.gpkg",
                       "peat_function": "landstatus/FEG__Indonesia__2017__Rev_Tipologi.gpkg",
-                      "licences": "landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg"}}
+                      "licences": "landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg",
+                      "dmpg": "dpg/dmpg_villages_sitmat.gpkg"}}         # DMPG villages, SiTMAT portal (repeat_common.fetch_sitmat_layers)
+DMPG_LAYER = "dmpg_villages"
+DMPG_COLS = ["PROVINSI", "KABUPATEN", "KECAMATAN", "DESA", "PROG_DMPG", "Skema_DPG"]
+DMPG_PROG_LABEL = {"Skema DMPG": "DMPG", "Skema DMPG dan DMPM": "DMPG and DMPM"}
 
 
 def load_cfg(path):
@@ -80,15 +84,15 @@ def peat_path(cfg):
 
 
 def now_points(cfg, g):
-    """This year's KLH hotspots inside g, kept levels only: x, y, month, high, on-peat (arrays)."""
+    """This year's hotspots inside g, kept levels only: x, y, month, high, on-peat (arrays)."""
     inp, data = cfg["inputs"], Path(cfg["data"])
     e = np.zeros(0)
     if not (inp.get("hotspots_now") and (data / inp["hotspots_now"]).exists()):
         return e, e, e.astype(int), e.astype(bool), e.astype(bool)
-    h = P._read_mask(data / inp["hotspots_now"], g, columns=["layer", "C_LEVEL", "Kepercayaa"])
+    h = P._read_mask(data / inp["hotspots_now"], g, layer="hotspots", columns=["month", "level"])
     if not len(h):
         return e, e, e.astype(int), e.astype(bool), e.astype(bool)
-    lvl = h["C_LEVEL"].fillna(h["Kepercayaa"]).astype("string").str.lower().map(P.LEVEL)
+    lvl = h["level"]
     keep = lvl.isin(cfg["now"]["levels"]).to_numpy()
     h, lvl = h[keep], lvl[keep]
     xs, ys = h.geometry.x.to_numpy(), h.geometry.y.to_numpy()
@@ -97,11 +101,13 @@ def now_points(cfg, g):
     pe = peat_path(cfg)
     ps = P.PeatSampler(pe) if pe else None
     onp = (ps.sample(ps.window(g), xs, ys) == 1) if ps is not None else np.ones(len(xs), bool)
-    return xs, ys, h["layer"].str[:2].astype(int).to_numpy(), (lvl == "high").to_numpy(), onp
+    return xs, ys, h["month"].astype(int).to_numpy(), (lvl == "high").to_numpy(), onp
 
 
-def peat_shape(cfg, g, tol):
-    """The peat cells of the GFW extent inside g as one lon/lat geometry, simplified; None when the extent is missing."""
+def peat_shape(cfg, g, tol_m):
+    """The peat cells of the GFW extent inside g as one lon/lat geometry, for the map only; None when the extent is missing.
+    The cell outline is simplified in the equal-area projection by tol_m metres and pieces smaller than one 76 m cell are dropped;
+    the rates sample the native raster, not this shape."""
     pe = peat_path(cfg)
     if not pe:
         return None
@@ -114,9 +120,11 @@ def peat_shape(cfg, g, tol):
     inv = Transformer.from_crs(ps.src.crs, 4326, always_xy=True)
     polys = [shapely.geometry.shape(geom) for geom, _ in shapes(m.astype(np.uint8), mask=m, transform=tr)]
     u = shapely.ops.transform(inv.transform, shapely.union_all(polys))
-    u = shapely.intersection(shapely.make_valid(u), g).simplify(tol, preserve_topology=True)
-    keep = [p for p in (u.geoms if u.geom_type.startswith("Multi") else [u]) if p.geom_type == "Polygon" and p.area > (3 * tol) ** 2]
-    return shapely.MultiPolygon(keep) if keep else None
+    u = to_aea(shapely.intersection(shapely.make_valid(u), g))
+    r = 0.5 * tol_m                                  # closing then opening rounds the 76 m steps and removes specks and hairline gaps
+    u = u.buffer(r).buffer(-2 * r).buffer(r).simplify(tol_m, preserve_topology=True)
+    keep = [p for p in (u.geoms if u.geom_type.startswith("Multi") else [u]) if p.geom_type == "Polygon" and p.area > 76.0 ** 2]
+    return from_aea(shapely.MultiPolygon(keep)) if keep else None
 
 
 def grid(g_ll, cell=None):
@@ -157,8 +165,8 @@ def near_licences(lon, lat, lic_m, dist_m):
     return inside, pi, li
 
 
-def _read(path, g, cols):
-    d = pyogrio.read_dataframe(path, mask=g, columns=cols)
+def _read(path, g, cols, layer=None):
+    d = pyogrio.read_dataframe(path, mask=g, columns=cols, **({"layer": layer} if layer else {}))
     d = d[d.geometry.notna() & ~d.geometry.is_empty].copy()
     d["geometry"] = shapely.make_valid(d.geometry.values)
     return d.reset_index(drop=True)
@@ -177,7 +185,7 @@ def _rings(geom, tol):
     for p in (list(g.geoms) if g.geom_type in ("MultiPolygon", "GeometryCollection") else [g]):
         if p.geom_type != "Polygon" or p.is_empty:
             continue
-        out.append([[[round(float(x), 4), round(float(y), 4)] for x, y in ring.coords] for ring in [p.exterior, *p.interiors]])
+        out.append([[[round(float(x), 5), round(float(y), 5)] for x, y in ring.coords] for ring in [p.exterior, *p.interiors]])
     return out
 
 
@@ -198,8 +206,57 @@ def _stats(layer, cls, order, labels, pts, hs, area_cell, khg_km2, peat_total):
     return rows
 
 
-def one(cfg, kid, name, g):
-    inp, data, oc = cfg["inputs"], Path(cfg["data"]), cfg["overlay"]
+def read_dmpg(path, g):
+    """DMPG villages (SiTMAT layer) touching g, geometry made valid."""
+    return _read(path, g, DMPG_COLS, layer=DMPG_LAYER)
+
+
+def land_rows(pts, hs, area_cell, khg_km2, peat_total, kws, feg, dpg):
+    """Forest-area function, peat function and DMPG village rows of one KHG, from the grid points `pts` and hotspots `hs`.
+    DMPG polygons do not overlap each other (checked on the delivered layer), so a point is in at most one village.
+    Returns rows, the class of each point per layer, the DMPG membership of points and hotspots, and one row per DMPG village."""
+    rows, pcs = [], {}
+    for layer, df, col, order, labels in (("forest", kws, "cls", KWS_ORDER, KWS_LABEL), ("feg", feg, "cls", FEG_ORDER, FEG_LABEL)):
+        pc = _first(pts, df, col).fillna("none") if len(df) else pd.Series("none", index=pts.index)
+        hc = _first(hs, df, col).fillna("none") if len(df) and len(hs) else pd.Series("none", index=hs.index, dtype=object)
+        pcs[layer] = pc
+        pcs[layer + "_hs"] = hc
+        rows += _stats(layer, pc, order, labels, pts, pd.DataFrame({"cls": hc.to_numpy(), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
+    has = dpg is not None and len(dpg)
+    vd = dpg.assign(vid=np.arange(len(dpg))) if has else None
+    pj = _first(pts, vd, "vid") if has else pd.Series(np.nan, index=pts.index)
+    hj = _first(hs, vd, "vid") if has and len(hs) else pd.Series(np.nan, index=hs.index, dtype=float)
+    p_in, h_in = pj.notna(), hj.notna()
+    hsd = lambda cls: pd.DataFrame({"cls": np.asarray(cls, object), "onp": hs["onp"].to_numpy()})
+    rows += _stats("dmpg", pd.Series(np.where(p_in, "in", "out"), index=pts.index), ["in"], {"in": "DMPG village"}, pts,
+                   hsd(np.where(h_in, "in", "out")), area_cell, khg_km2, peat_total)
+    if has:
+        prog = dpg["PROG_DMPG"].map(DMPG_PROG_LABEL).fillna(dpg["PROG_DMPG"]).to_numpy(object)
+        pp = pd.Series(np.where(p_in, prog[pj.fillna(0).astype(int).to_numpy()], "out"), index=pts.index)
+        hp = np.where(h_in.to_numpy(), prog[hj.fillna(0).astype(int).to_numpy()], "out") if len(hs) else np.array([], object)
+        labels = {q: q for q in DMPG_PROG_LABEL.values()}
+        rows += _stats("dmpg_prog", pp, list(labels), labels, pts, hsd(hp), area_cell, khg_km2, peat_total)
+    # kawasan hutan inside the DMPG villages: the same classes, restricted to village land
+    fp = pcs["forest"].where(p_in, "out")
+    fh = pcs["forest_hs"].where(h_in, "out") if len(hs) else pcs["forest_hs"]
+    rows += _stats("dmpg_forest", fp, KWS_ORDER, KWS_LABEL, pts, hsd(fh), area_cell, khg_km2, peat_total)
+    vil = []
+    if has:
+        peat, burned = pts["peat"].to_numpy(), pts["burned"].to_numpy()
+        vi, hv, onp = pj.to_numpy(), hj.to_numpy(), hs["onp"].to_numpy()
+        for k in np.unique(vi[~np.isnan(vi)]).astype(int):
+            m = vi == k
+            vil.append({"village": dpg["DESA"].iloc[k], "kecamatan": dpg["KECAMATAN"].iloc[k], "kabupaten": dpg["KABUPATEN"].iloc[k],
+                        "provinsi": dpg["PROVINSI"].iloc[k], "programme": dpg["PROG_DMPG"].iloc[k], "scheme": dpg["Skema_DPG"].iloc[k],
+                        "area_km2": m.sum() * area_cell, "peat_km2": (m & peat).sum() * area_cell,
+                        "burned_peat_km2": (m & peat & burned).sum() * area_cell,
+                        "hs_now_peat": int(((hv == k) & onp).sum()) if len(hs) else 0})
+    return rows, pcs, p_in, h_in, vil
+
+
+def base_points(cfg, g):
+    """Grid points of one KHG with their peat and burned (2015-2025) flags, this year's hotspots inside it, the cell area and size."""
+    inp, data = cfg["inputs"], Path(cfg["data"])
     g = shapely.make_valid(g)
     lon, lat, area_cell, cell = grid(g)
     pts = gpd.GeoDataFrame({"peat": np.zeros(len(lon), bool), "burned": np.zeros(len(lon), bool)}, geometry=gpd.points_from_xy(lon, lat), crs=4326)
@@ -216,31 +273,53 @@ def one(cfg, kid, name, g):
             pts.loc[hit.index.unique(), "burned"] = True
     xs, ys, mon, hi, onp = now_points(cfg, g)
     hs = gpd.GeoDataFrame({"onp": np.asarray(onp, bool), "high": np.asarray(hi, bool)}, geometry=gpd.points_from_xy(xs, ys), crs=4326)
-    khg_km2 = len(pts) * area_cell
-    peat_total = float(pts["peat"].sum() * area_cell)
+    return g, lon, lat, pts, hs, area_cell, cell
 
+
+def read_forest_feg(cfg, g):
+    """Forest-area function (class per polygon: cons, hl, prod, hpk, apl, other) and peat ecosystem function polygons inside g."""
+    inp, data = cfg["inputs"], Path(cfg["data"])
     kws = _read(data / inp["forest_area"], g, ["Fungsi"])
     kws["cls"] = kws["Fungsi"].map(CODE_TO_KWS).fillna("other")
     feg = _read(data / inp["peat_function"], g, ["FEG_KGHLTR"])
     feg["cls"] = np.where(feg["FEG_KGHLTR"].str.contains("Lindung", na=False), "lindung", "budidaya")
+    return kws, feg
+
+
+def one_land(cfg, kid, name, g):
+    """Forest area, peat function and DMPG rows (and DMPG villages) of one KHG, without licences, rings or map layers.
+    The rows are the same as those of `one`, so the figures agree for a KHG computed by both."""
+    data, inp = Path(cfg["data"]), cfg["inputs"]
+    g, lon, lat, pts, hs, area_cell, cell = base_points(cfg, g)
+    khg_km2 = len(pts) * area_cell
+    peat_total = float(pts["peat"].sum() * area_cell)
+    kws, feg = read_forest_feg(cfg, g)
+    dpg = read_dmpg(data / inp["dmpg"], g) if inp.get("dmpg") and (data / inp["dmpg"]).exists() else None
+    rows, pcs, dm_in, dm_hit, vil = land_rows(pts, hs, area_cell, khg_km2, peat_total, kws, feg, dpg)
+    for r in rows:
+        r.update({"khg_id": kid, "khg": name})
+    for v in vil:
+        v.update({"khg_id": kid})
+    return rows, vil, {"khg_km2_grid": khg_km2, "cell_m": cell, "hs_inside": int(len(hs))}
+
+
+def one(cfg, kid, name, g):
+    inp, data, oc = cfg["inputs"], Path(cfg["data"]), cfg["overlay"]
+    g, lon, lat, pts, hs, area_cell, cell = base_points(cfg, g)
+    khg_km2 = len(pts) * area_cell
+    peat_total = float(pts["peat"].sum() * area_cell)
+
+    kws, feg = read_forest_feg(cfg, g)
     ring_m = 1000.0 * oc["ring_km"]
     g_ring = from_aea(to_aea(g).buffer(ring_m))     # licences next door draw a ring into the KHG
     lic = _read(data / inp["licences"], g_ring, ["PERUSAHAAN", "IZIN_USAHA", "KEG_USAHA"])
     lic["cls"] = lic["IZIN_USAHA"].map(LIC_VALUE)
     lic_m = to_aea(lic.geometry.values) if len(lic) else np.array([])
     vil = _read(data / inp["villages"], g, ["OBJECTID", "DESA_2023", "KEC_2023", "KABKO_2023"])
-    vil["dmpg"] = vil["OBJECTID"].isin(P.dmpg_ids(data / inp["dmpg"])) if inp.get("dmpg") else False
-    dpg = (_read(data / inp["dmpg"], g, ["desa", "kecamatan", "target_objectid"]) if inp.get("dmpg") and (data / inp["dmpg"]).exists()
-           else vil.iloc[:0])
+    dpg = read_dmpg(data / inp["dmpg"], g) if inp.get("dmpg") and (data / inp["dmpg"]).exists() else None
 
-    rows, report, pcs = [], {}, {}
-    for layer, df, col, order, labels in (("forest", kws, "cls", KWS_ORDER, KWS_LABEL), ("feg", feg, "cls", FEG_ORDER, FEG_LABEL)):
-        pc = _first(pts, df, col).fillna("none") if len(df) else pd.Series("none", index=pts.index)
-        hc = _first(hs, df, col).fillna("none") if len(df) and len(hs) else pd.Series("none", index=hs.index, dtype=object)
-        hs2 = pd.DataFrame({"cls": hc.to_numpy(), "onp": hs["onp"].to_numpy()})
-        pcs[layer] = pc
-        rows += _stats(layer, pc, order, labels, pts, hs2, area_cell, khg_km2, peat_total)
-        report[layer] = int(sum(r["hs_now"] for r in rows if r["layer"] == layer))
+    rows, pcs, dm_in, dm_hit, dm_vil = land_rows(pts, hs, area_cell, khg_km2, peat_total, kws, feg, dpg)
+    report = {k: int(sum(r["hs_now"] for r in rows if r["layer"] == k)) for k in ("forest", "feg")}
 
     # licences: overlapping, so one flag per type and one for any licence
     pl = gpd.sjoin(pts[["geometry"]], lic[["cls", "PERUSAHAAN", "KEG_USAHA", "geometry"]], how="inner", predicate="within") if len(lic) else pd.DataFrame()
@@ -285,17 +364,6 @@ def one(cfg, kid, name, g):
             hv[gpd.sjoin(hs[["geometry"]], vil[["geometry"]], how="inner", predicate="within").index.unique()] = True
     rows += _stats("village", pd.Series(np.where(pv, "in", "out"), index=pts.index), ["in"], {"in": "Target village"}, pts,
                    pd.DataFrame({"cls": np.where(hv, "in", "out"), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
-    # DPG villages of the BRG atlas (KLH 2023 / BIG 2026 boundaries; most are target villages too): context, not scored
-    pd_ = pd.Series(False, index=pts.index)
-    hd = pd.Series(False, index=hs.index)
-    dv = dpg
-    if len(dv):
-        pd_[gpd.sjoin(pts[["geometry"]], dv[["geometry"]], how="inner", predicate="within").index.unique()] = True
-        if len(hs):
-            hd[gpd.sjoin(hs[["geometry"]], dv[["geometry"]], how="inner", predicate="within").index.unique()] = True
-    rows += _stats("dmpg", pd.Series(np.where(pd_, "in", "out"), index=pts.index), ["in"], {"in": "DPG village"}, pts,
-                   pd.DataFrame({"cls": np.where(hd, "in", "out"), "onp": hs["onp"].to_numpy()}), area_cell, khg_km2, peat_total)
-
     for r in rows:
         r.update({"khg_id": kid, "khg": name})
     # hotspots by class add back to the hotspots inside the KHG
@@ -328,9 +396,9 @@ def one(cfg, kid, name, g):
     actors.sort(key=lambda a: (-(a["hs_now"] + a["ring_hs_now"]), -a["area_km2"]))
 
     # map layers
-    tol = 0.0003 + 0.00002 * np.sqrt(khg_km2)
+    tol = 0                                   # map layers keep the source geometry
     cl = lambda geoms: shapely.intersection(shapely.make_valid(geoms), g)
-    mp = {"forest": [], "feg": [], "licence": [], "village": [], "ring": []}
+    mp = {"forest": [], "feg": [], "licence": [], "village": [], "ring": [], "dmpg": []}
     for df, key in ((kws, "forest"), (feg, "feg")):
         if len(df):
             gc = cl(df.geometry.values)
@@ -359,15 +427,15 @@ def one(cfg, kid, name, g):
         gc = cl(vil.geometry.values)
         for k, geom in enumerate(gc):
             if not geom.is_empty:
-                mp["village"].append({"n": f'{vil["DESA_2023"].iloc[k]}, {vil["KEC_2023"].iloc[k]}', "r": _rings(geom, tol),
-                                      **({"d": 1} if vil["dmpg"].iloc[k] else {})})
-    extra = dpg[dpg["target_objectid"].isna()] if len(dpg) else dpg     # DPG villages outside the target villages: x = 1
-    if len(extra):
-        for k, geom in enumerate(cl(extra.geometry.values)):
+                mp["village"].append({"n": f'{vil["DESA_2023"].iloc[k]}, {vil["KEC_2023"].iloc[k]}', "r": _rings(geom, tol)})
+    if dpg is not None and len(dpg):
+        for k, geom in enumerate(cl(dpg.geometry.values)):
             if not geom.is_empty:
-                mp["village"].append({"n": f'{extra["desa"].iloc[k]}, {extra["kecamatan"].iloc[k]}', "r": _rings(geom, tol), "d": 1, "x": 1})
+                mp["dmpg"].append({"n": f'{dpg["DESA"].iloc[k]}, {dpg["KECAMATAN"].iloc[k]}',
+                                   "p": DMPG_PROG_LABEL.get(dpg["PROG_DMPG"].iloc[k], dpg["PROG_DMPG"].iloc[k]),
+                                   "s": dpg["Skema_DPG"].iloc[k], "r": _rings(geom, tol)})
     mp["cell_m"] = cell
-    return rows, actors, mp
+    return rows, actors, mp, dm_vil
 
 
 def main(argv=None):
@@ -382,11 +450,12 @@ def main(argv=None):
         sel = sel[sel.khg_id.isin(a.only)]
     out = Path(cfg["_dir"]) / "overlay"
     out.mkdir(parents=True, exist_ok=True)
-    rows, actors, maps = [], [], {}
+    rows, actors, maps, vrows = [], [], {}, []
     for r in sel.itertuples():
         log.info("%s %s", r.khg_id, r.nama)
-        rw, ac, mp = one(cfg, r.khg_id, r.nama, r.geometry)
+        rw, ac, mp, dv = one(cfg, r.khg_id, r.nama, r.geometry)
         rows += rw
+        vrows += [{"khg_id": r.khg_id, **v} for v in dv]
         actors += ac
         maps[r.khg_id] = mp
     top = cfg["overlay"]["top_actors"]
@@ -402,6 +471,8 @@ def main(argv=None):
         ac = ac.round(4)
         ac.to_csv(out / "overlay_actors.csv", index=False)
         ac.groupby("khg_id").head(top).to_csv(out / "overlay_actors_top.csv", index=False)
+    if vrows:
+        pd.DataFrame(vrows).round(4).to_csv(out / "overlay_dmpg_villages.csv", index=False)
     (out / "overlay_map.json").write_text(json.dumps(maps, separators=(",", ":")), encoding="utf-8")
     log.info("%d KHG -> %s", len(maps), out)
 

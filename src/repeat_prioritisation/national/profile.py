@@ -32,6 +32,7 @@ import rasterio
 import shapely
 import shapely.ops
 import yaml
+from pyproj import Transformer
 from rasterio.features import geometry_mask
 from rasterio.windows import Window
 
@@ -52,12 +53,12 @@ DEFAULTS = {
         "canals": "kanal_osgm_khg_existing_Indonesia.gpkg",
         "blocks": "infrastruktur_hidrologis_existing_BRGM_Indonesia.gpkg",
         "villages": "desa_target_pemulihan_ekosistem_gambut.gpkg",
-        "dmpg": "dpg/dpg_villages_boundaries.gpkg",   # DPG villages of the BRG atlas with KLH 2023 / BIG 2026 boundaries (repeat_common.fetch_dpg_boundaries); context, not scored
+        "dmpg": "dpg/dmpg_villages_sitmat.gpkg",   # DMPG villages of the SiTMAT portal (repeat_common.fetch_sitmat_layers, layer dmpg_villages); context, not scored
         "peat_depth": "kedalaman_gambut_bbsdlp.gpkg",
-        "hotspots_now": "_data_hotspot_Januari_September_2026.gpkg",   # KLH-curated MODIS hotspots of the current year, monthly layers
+        "hotspots_now": "hotspots_modis_2026.gpkg",   # MODIS hotspots of the current year: KLH file to its last date, FIRMS NRT after it (investigations.hotspot_splice)
     },
-    # current-year hotspots: two schemas in one file (numeric confidence + C_LEVEL Rendah/Sedang/Tinggi in some months,
-    # Kepercayaan Low/Medium/High only in the others; FRP in 4 of 9 months), harmonised to low / medium / high
+    # current-year hotspots: one schema (month, level low / medium / high, frp, acq_date, source); the KLH months without a
+    # date or FRP have them empty, so FRP is never summed across months
     "now": {"levels": ["medium", "high"], "year": 2026},
     "years": {"baseline": [2015, 2022], "validation": [2023, 2025]},
     "hotspots": {"confidence": ["n", "h"], "types": [0]},   # FIRMS VIIRS: l/n/h; type 0 = vegetation fire
@@ -130,6 +131,9 @@ def load_khg(cfg, only=None):
     khg["area_km2"] = proj.geometry.area.to_numpy() / 1e6
     khg["geom_aea"] = proj.geometry.values
     return khg.reset_index(drop=True)
+
+
+_TF_AEA = Transformer.from_crs(4326, AEA, always_xy=True)
 
 
 def _read_mask(path, geom, **kw):
@@ -280,11 +284,8 @@ LEVEL = {"rendah": "low", "low": "low", "sedang": "medium", "medium": "medium", 
 def hotspots_now(path, khg, ncfg, sampler=None):
     """Current-year hotspots (KLH-curated MODIS, one layer per month) per KHG and month: kept (level filter), kept on peat,
     high-confidence on peat, and FRP where the month has it (4 of 9 months do, so FRP is never summed across months)."""
-    pts = pyogrio.read_dataframe(path, columns=["layer", "C_LEVEL", "Kepercayaa", "FRP", "ACQ_DATE"])
-    pts["month"] = pts["layer"].str[:2].astype(int)
-    lvl = pts["C_LEVEL"].fillna(pts["Kepercayaa"]).astype("string").str.lower().map(LEVEL)
-    pts["level"] = lvl
-    pts["keep"] = lvl.isin(ncfg["levels"])
+    pts = pyogrio.read_dataframe(path, layer="hotspots", columns=["month", "level", "frp", "acq_date"])
+    pts["keep"] = pts["level"].isin(ncfg["levels"])
     j = gpd.sjoin(pts, khg[["khg_id", "geometry"]], how="inner", predicate="within")
     j["peat"] = False
     if sampler is not None:
@@ -296,12 +297,12 @@ def hotspots_now(path, khg, ncfg, sampler=None):
         j["peat"] = peat
     j["kp"] = j["keep"] & j["peat"]
     j["hp"] = j["kp"] & (j["level"] == "high")
-    j["has_frp"] = j["FRP"].notna()
+    j["has_frp"] = j["frp"].notna()
     g = j.groupby(["khg_id", "month"])
     out = pd.DataFrame({"n_kept": g["keep"].sum(), "n_kept_peat": g["kp"].sum(), "n_high_peat": g["hp"].sum(),
                         "n_frp_peat": g.apply(lambda d: (d["kp"] & d["has_frp"]).sum(), include_groups=False),
-                        "frp_sum_peat": g.apply(lambda d: d.loc[d["kp"] & d["has_frp"], "FRP"].sum(), include_groups=False)}).reset_index()
-    last = pd.to_datetime(pts["ACQ_DATE"]).max()
+                        "frp_sum_peat": g.apply(lambda d: d.loc[d["kp"] & d["has_frp"], "frp"].sum(), include_groups=False)}).reset_index()
+    last = pd.to_datetime(pts["acq_date"], errors="coerce").max()
     return out, {"last_date": None if pd.isna(last) else str(last.date()), "n_points": int(len(pts)),
                  "n_kept": int(pts["keep"].sum()), "months": sorted(pts["month"].unique().tolist())}
 
@@ -324,11 +325,24 @@ def canal_length(path, khg):
     return pd.DataFrame(rows, columns=["khg_id", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary"])
 
 
-def dmpg_ids(path):
-    """OBJECTID of the target villages that are DPG villages in the BRG atlas (column target_objectid)."""
-    if not path.exists():
-        return set()
-    return set(pyogrio.read_dataframe(path, columns=["target_objectid"], read_geometry=False)["target_objectid"].dropna().astype(int))
+def dmpg_stats(path, khg):
+    """DMPG villages (SiTMAT layer `dmpg_villages`) per KHG: the number whose representative point lies inside (n_dmpg) and the
+    village land inside the KHG in km2 (dmpg_km2, equal-area, polygons do not overlap each other)."""
+    v = pyogrio.read_dataframe(path, layer="dmpg_villages", columns=[])
+    v = v[v.geometry.notna()].copy()
+    v["geometry"] = shapely.make_valid(v.geometry.values)
+    n = gpd.sjoin(gpd.GeoDataFrame(geometry=v.representative_point(), crs=v.crs), khg[["khg_id", "geometry"]], how="inner", predicate="within")
+    n = n.groupby("khg_id").size().rename("n_dmpg")
+    tree, geoms = shapely.STRtree(v.geometry.values), v.geometry.values
+    rows = []
+    for r in khg.itertuples():
+        hit = tree.query(r.geometry, predicate="intersects")
+        if len(hit):
+            inter = shapely.intersection(geoms[hit], shapely.make_valid(r.geometry))
+            km2 = float(shapely.area(shapely.transform(inter, lambda c: np.column_stack(_TF_AEA.transform(c[:, 0], c[:, 1])))).sum() / 1e6)
+            rows.append((r.khg_id, km2))
+    a = pd.DataFrame(rows, columns=["khg_id", "dmpg_km2"])
+    return n.reset_index().merge(a, on="khg_id", how="outer")
 
 
 def count_inside(path, khg, name, rep="point", ids=None):
@@ -405,18 +419,17 @@ def build_profile(cfg, only=None, khg=None):
     canals = canal_length(p("canals"), khg)
     blocks = count_inside(p("blocks"), khg, "n_infra_ada")
     desa = count_inside(p("villages"), khg, "n_desa_target", rep="centroid")
-    if inp.get("dmpg"):
-        desa = desa.merge(count_inside(p("dmpg"), khg, "n_dmpg", rep="centroid"), on="khg_id", how="left")
+    dmpg = dmpg_stats(p("dmpg"), khg) if inp.get("dmpg") and p("dmpg").exists() else None      # its own table: KHG inside a village have no target villages
     peat = peat_depth(p("peat_depth"), khg)
     tma = tma_by_khg(cfg["tma"], khg) if cfg["tma"].get("path") else None
 
     prof = khg.drop(columns=["geom_aea"]).copy()
-    for t in (freq, canals, blocks, desa, peat, tma, peatx):
+    for t in (freq, canals, blocks, desa, dmpg, peat, tma, peatx):
         if t is not None:
             prof = prof.merge(t, on="khg_id", how="left")
     if tma is not None:
         prof["n_tma_stations"] = prof["n_tma_stations"].fillna(0)
-    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary", "n_infra_ada", "n_desa_target", "n_dmpg"):
+    for c in ("burned_ge1_km2", "burned_ge2_km2", "burned_ge3_km2", "canal_km", "canal_segments", "canal_km_primary", "canal_km_secondary", "canal_km_tertiary", "n_infra_ada", "n_desa_target", "n_dmpg", "dmpg_km2"):
         if c in prof:
             prof[c] = prof[c].fillna(0)
     A = prof["area_km2"]
