@@ -606,6 +606,27 @@ function ovSeg(layer,rows,tot){
   const mk=(k)=>{const v=rows.map(r=>r.v[k]),den=Math.max(tot[k],d3.sum(v))||1;
     return v.map((x,j)=>x>0?`<i style="width:${100*x/den}%;background:${ovColor(layer,rows[j].c)}"${tipAttr(`<b>${t(rows[j].l)}</b><br>${fmt(x,k===2?0:1)}${k===2?"":" km2"} <span>(${fmt(100*x/(tot[k]||1),0)}% ${t(["of the peat","of the burned peat","of the hotspots"][k])})</span>`)}></i>`:"").join("")};
   return [0,1,2].map(k=>mk(k))}
+// fire by land tenure: hotspots on peat per 100 km2 of peat, this year against the 2015-2025 mean over the same calendar window
+const tnState={high:false,split:false};
+const TNLAB={licence:"Business licence",forest:"Forest area, no licence",other_land:"Other land"};
+function tnColor(k){return k==="licence"?(isDark()?"#d95926":"#eb6834"):k==="forest"?"#008300":(isDark()?"#3987e5":"#2a78d6")}
+function tenureHtml(P){
+  const T=P.tn;if(!T||!T.a.length)return"";
+  const key=(r)=>r[0]+(tnState.split?(r[2]?":d":":o"):"");
+  const G=new Map(),get=(r)=>{const k=key(r);if(!G.has(k))G.set(k,{k,ten:r[0],dm:r[2],peat:0,n:new Map()});return G.get(k)};
+  T.a.forEach(r=>{get(r).peat+=r[3]});
+  T.h.forEach(r=>{if(tnState.high&&r[4]!=="h")return;const g=get(r);g.n.set(r[3],(g.n.get(r[3])||0)+r[5])});
+  const ord=Object.keys(TNLAB),rows=[...G.values()].filter(g=>g.peat>0).sort((a,b)=>ord.indexOf(a.ten)-ord.indexOf(b.ten)||b.dm-a.dm).map(g=>{
+    const n26=g.n.get(2026)||0;let past=0;for(let y=2015;y<=2025;y++)past+=(g.n.get(y)||0)/11;
+    const r26=100*n26/g.peat,rp=100*past/g.peat;return {...g,n26,past,r26,rp,ratio:rp>0?r26/rp:null,few:g.peat<5||n26+past*11<20}});
+  if(!rows.length)return"";
+  const top=d3.max(rows,g=>Math.max(g.r26,g.rp))||1,end=(T.end||"").replace("-","/");
+  const lab=g=>t(TNLAB[g.ten])+(tnState.split?` <small>${t(g.dm?"DMPG village land":"Outside DMPG")}</small>`:"");
+  return `<div class="ovact"><div class="ovhead"><h3 class="hasTip"${tipAttr(t("Hotspots on peat per 100 km2 of peat from 1 January to {d}. Bar: 2026. Tick: mean of 2015 to 2025 over the same dates. Each point of the KHG takes one class: business licence, forest area without a licence, other land. DMPG village land can fall in any class. A comparison of rates is an association; it does not show the cause of a fire or who is responsible.",{d:end}))}>${t("Fire by land tenure")}</h3>
+    <label class="chk"><input type="checkbox" data-tn="split"${tnState.split?" checked":""}> ${t("Split by DMPG village land")}</label> <label class="chk"><input type="checkbox" data-tn="high"${tnState.high?" checked":""}> ${t("High confidence only")}</label></div>`
+    +rows.map(g=>`<div class="ovrow" style="grid-template-columns:215px 1fr 118px;${g.few?"opacity:.55":""}"><span class="ovl">${lab(g)}</span><div class="ovbar" style="position:relative"${tipAttr(`<b>${t(TNLAB[g.ten])}</b><br>${fmt(g.peat,0)} km2 ${t("of peat")}<br>2026: ${fmt(g.n26,0)} ${t("hotspots")}<br>${t("Mean 2015 to 2025")}: ${fmt(g.past,1)}`)}><i style="width:${100*g.r26/top}%;background:${tnColor(g.ten)}"></i><b style="position:absolute;top:-2px;bottom:-2px;width:2px;left:${100*g.rp/top}%;background:var(--ink)"></b></div><span class="ovv">${fmt(g.r26,g.r26<10?1:0)} / ${fmt(g.rp,g.rp<10?1:0)}${g.ratio!=null?` <b>×${fmt(g.ratio,g.ratio<10?1:0)}</b>`:""}</span></div>`).join("")
+    +`<p class="hint">${t("Faded rows have few detections or little peat.")} ${t("2026 / mean of 2015 to 2025, per 100 km2 of peat.")}</p></div>`;
+}
 function renderOv(P){
   const host=$("#p-ov-panel");host.innerHTML="";if(!P||!P.ov)return;
   const S=P.ov.s,fo=S.forest||[],tot=[d3.sum(fo,r=>r[2]),d3.sum(fo,r=>r[3]),d3.sum(fo,r=>r[4])];
@@ -633,6 +654,7 @@ function renderOv(P){
     html+=`<div class="ovg"><div class="ovt hasTip"${tipAttr(t(g.tip))}>${t(g.title)}</div><div class="ovleg">${rows.map(r=>`<span><span class="sw" style="background:${ovColor(g.layer,r.c)}"></span>${t(r.l)}${tot[0]?` <small>${fmt(100*r.v[0]/tot[0],0)}%</small>`:""}</span>`).join("")}</div>`+
       [0,1,2].map(k=>`<div class="ovrow"><span class="ovl hasTip"${tipAttr(t(rowLab[k][1]))}>${t(rowLab[k][0])}</span><div class="ovbar">${bars[k]}</div><span class="ovv">${totTxt[k]}</span></div>`).join("")+`</div>`});
   html+="</div>";
+  html+=tenureHtml(P);
   const A=P.ov.a;
   html+=`<div class="ovact"><div class="ovt hasTip"${tipAttr(t("Licence holders with a licence or a 5 km ring in this KHG, sorted by hotspots this year in the licence and its ring. Overlapping licences of one holder count once."))}>${t("Licence holders")}</div>`;
   if(!A.length)html+=`<p class="hint">${t("No licence of the 2025 layer overlaps this KHG.")}</p>`;
@@ -645,6 +667,7 @@ function renderOv(P){
     V.map((v,j)=>`<tr class="zr" data-z="dmpg" data-i="${j}"><td style="text-align:left">${esc(v[0])}</td><td style="text-align:left">${esc(v[1])}</td><td style="text-align:left">${esc(v[2].replace("Skema ",""))}</td><td style="text-align:left">${esc(v[3])}</td><td>${fmt(v[4],1)}</td><td>${fmt(v[5],1)}</td><td>${fmt(v[6],1)}</td><td>${fmt(v[7],0)}</td></tr>`).join("")+`</tbody></table></div></div>`;
   host.innerHTML=html;
   host.onclick=e=>{const r=e.target.closest("tr.zr");if(r)zoomTo(P,r.dataset.z,+r.dataset.i)};
+  host.onchange=e=>{const k=e.target.dataset&&e.target.dataset.tn;if(k){tnState[k]=e.target.checked;renderOv(P)}};
 }
 // click a licence holder or DMPG village row: switch its layer on and fly to its polygons on the map
 function zoomTo(P,kind,i){

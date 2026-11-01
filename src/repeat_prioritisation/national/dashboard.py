@@ -282,6 +282,19 @@ def build(cfg, top_n, out_path):
                         "v": [[r.village, r.kecamatan, r.programme, r.scheme, rd(r.area_km2, 1), rd(r.peat_km2, 1), rd(r.burned_peat_km2, 1), int(r.hs_now_peat)]
                               for r in ovv[ovv.khg_id == k].sort_values("area_km2", ascending=False).itertuples()]}
 
+    tn_dir = base / "tenure"
+    if (tn_dir / "tenure_area.csv").exists() and (tn_dir / "tenure_hotspots.csv").exists():   # `repeat-national-tenure`
+        ta = pd.read_csv(tn_dir / "tenure_area.csv", dtype={"khg_id": str})
+        th = pd.read_csv(tn_dir / "tenure_hotspots.csv", dtype={"khg_id": str})
+        th = th[th["ytd"]]
+        end = json.loads((tn_dir / "tenure_meta.json").read_text(encoding="utf-8")).get("window_end") if (tn_dir / "tenure_meta.json").exists() else None
+        for k, pr in profiles.items():
+            a_, h_ = ta[ta.khg_id == k], th[th.khg_id == k]
+            if len(a_):
+                pr["tn"] = {"end": end,
+                            "a": [[r.tenure, r.sub, int(r.dmpg), round(r.peat_km2, 2), round(r.burned_peat_km2, 2)] for r in a_.itertuples()],
+                            "h": [[r.tenure, r.sub, int(r.dmpg), int(r.year), r.conf[0], int(r.n)] for r in h_.itertuples()]}
+
     validation = None
     if vrep:
         v = vrep["validation"]
