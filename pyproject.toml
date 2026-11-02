@@ -34,6 +34,7 @@ repeat-national-tenure = "repeat_prioritisation.national.tenure:main"   # hotspo
 repeat-national-monthly = "repeat_prioritisation.national.monthly:main"   # VIIRS hotspots on peat per KHG, year and month (the heat map in the profile)
 repeat-national-tenure-dome = "repeat_prioritisation.national.tenure_dome:main"   # the same by position on the peat dome (KHG with a licence-edge run)
 repeat-national-tenure-water = "repeat_prioritisation.national.tenure_water:main"   # model dry-season depth by land tenure (KHG with a model run)
+repeat-hypotheses = "repeat_prioritisation.investigations.hypotheses:main"   # hypothesis tests on the 2026 fire season by tenure and place
 repeat-national-dashboard = "repeat_prioritisation.national.dashboard:main"
 repeat-national-tiles = "repeat_prioritisation.national.tiles:main"             # PMTiles of the dashboard map layers (tippecanoe in Docker)
 

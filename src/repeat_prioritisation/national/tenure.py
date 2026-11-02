@@ -91,17 +91,17 @@ def viirs(cfg, g):
             h = h[h["type"] == 0]
         parts.append(h[["acq_date", "confidence", "geometry"]])
     if not parts:
-        return gpd.GeoDataFrame({"year": [], "conf": [], "ytd": []}, geometry=[], crs=4326)
+        return gpd.GeoDataFrame({"year": [], "conf": [], "ytd": [], "date": []}, geometry=[], crs=4326)
     h = pd.concat(parts, ignore_index=True)
     h = h[h["confidence"].isin(["n", "h"]) & shapely.contains_xy(g, h.geometry.x.to_numpy(), h.geometry.y.to_numpy())]
     d = pd.to_datetime(h["acq_date"])
     cut = last_day(data)
-    h = h.assign(year=d.dt.year, conf=h["confidence"].map({"n": "medium", "h": "high"}), ytd=(d.dt.month * 100 + d.dt.day) <= cut.month * 100 + cut.day)
+    h = h.assign(date=d, year=d.dt.year, conf=h["confidence"].map({"n": "medium", "h": "high"}), ytd=(d.dt.month * 100 + d.dt.day) <= cut.month * 100 + cut.day)
     pe = O.peat_path(cfg)
     if pe and len(h):
         ps = P.PeatSampler(pe)
         h = h[ps.sample(ps.window(g), h.geometry.x.to_numpy(), h.geometry.y.to_numpy()) == 1]
-    return h[["year", "conf", "ytd", "geometry"]].reset_index(drop=True)
+    return h[["year", "conf", "ytd", "date", "geometry"]].reset_index(drop=True)
 
 
 def one(cfg, kid, name, g):
