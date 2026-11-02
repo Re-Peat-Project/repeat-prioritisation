@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Interactive dashboard of the national KHG ranking: one self-contained HTML file.
 
-  repeat-national-dashboard --config configs/examples/national_profile.yaml [--top 25] [--out file.html] [--reassemble]
+  repeat-national-dashboard --config configs/examples/national_profile.yaml [--top 25|all] [--out file.html] [--reassemble]
 
 Reads what `repeat-national-profile --mode operational` wrote, the Stage 3 tables
 (`repeat-national-stage3 summarize`) and the input layers named in the config, for the maps of the KHG that get a detailed
-profile: the top N by the default weights plus the team's selected KHG. The weights are applied in the browser, with the same
+profile: the top N by the default weights plus the team's selected KHG, or every KHG with `--top all`. A profile shows what has been computed for
+its KHG: rain and deficit, land cover, land status and tenure exist only for the KHG that went through stage 3, and are left out for the others. The weights are applied in the browser, with the same
 scaling as common.scoring (5th to 95th percentile of the KHG that pass the filters), so moving a slider re-ranks live.
 Template, scripts and the English to Indonesian dictionary (i18n_id.js): national/assets/. D3 (ISC) and MapLibre GL JS (BSD) are vendored there. The basemap is OpenFreeMap (Positron style, OpenMapTiles data, OpenStreetMap contributors): it loads from the internet, the rest works offline.
 """
@@ -207,7 +208,7 @@ def build(cfg, top_n, out_path):
     geo = [rings(shapely.make_valid(khg.loc[k, "geometry"]), 0.012) for k in order]
 
     ranked = prof[prof.skor_risiko.notna()].sort_values("peringkat")
-    prof_ids = list(dict.fromkeys(list(ranked.khg_id.head(top_n)) + list(team)))
+    prof_ids = order[:] if top_n is None else list(dict.fromkeys(list(ranked.khg_id.head(top_n)) + list(team)))
     conf = prof.confidence.map({"tinggi": 2, "sedang": 1, "rendah": 0}).fillna(0).astype(int)
 
     land = land_shares(base, order)
@@ -306,11 +307,25 @@ def build(cfg, top_n, out_path):
         "generated": date.today().isoformat(), "period_now": nowrep.get("last_date"), "baseline": f"{nb[0]} to {nb[1]}",
         "n_khg": len(prof), "min_area": cfg["min_area_km2"], "min_peat": cfg["peat"]["min_peat_km2"],
         "weights": {pid: float(rep["weights"].get(col, 0.0)) for pid, col, *_ in PARAMS}, "validation": validation, "peat_by_island": gpm_by_island,
-        "top_n": top_n, "overlay": has_ov, **hs_sources(cfg),
+        "top_n": top_n, "n_profiles": len(profiles), "n_full": sum(1 for p_ in profiles.values() if p_["deficit"]), "overlay": has_ov, **hs_sources(cfg),
     }
     params = [{"id": pid, "group": grp, "label": lab, "unit": unit} for pid, _, grp, lab, unit, _ in PARAMS]
     tiles.write_sources(Path(cfg["out"]) / "tiles" / "src", feats)
     return {"meta": meta, "params": params, "khg": cols, "geo": geo}, profiles
+
+
+def attach_monthly(base, profiles):
+    """VIIRS hotspots on peat per month and year (`repeat-national-monthly`) as profile["hm"] = [[year, month, medium, high], ...]."""
+    f = Path(base) / "monthly" / "hotspot_month_year.csv"
+    if not f.exists():
+        return
+    d = pd.read_csv(f, dtype={"khg_id": str}).pivot_table(index=["khg_id", "year", "month"], columns="conf", values="n", fill_value=0).reset_index()
+    for c in ("medium", "high"):
+        if c not in d:
+            d[c] = 0
+    for k, g in d.groupby("khg_id"):
+        if k in profiles:
+            profiles[k]["hm"] = [[int(r.year), int(r.month), int(r.medium), int(r.high)] for r in g.itertuples()]
 
 
 def assemble(data, profiles, out_path):
@@ -333,10 +348,10 @@ def assemble(data, profiles, out_path):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", required=True)
-    ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--top", type=lambda v: None if v == "all" else int(v), default=25, help="number of top-ranked KHG to profile (plus the team's), or 'all'")
     ap.add_argument("--out")
     ap.add_argument("--reassemble", action="store_true", help="reuse the data of the last build (dashboard_data.json) and only rebuild the page")
-    ap.add_argument("--no-tiles", action="store_true", help="skip the PMTiles archive of the map layers (repeat-national-tiles runs it on its own)")
+    ap.add_argument("--no-tiles", action="store_true", help="skip the per-KHG PMTiles archives of the map layers (repeat-national-tiles runs it on its own)")
     a = ap.parse_args(argv)
     cfg = copy.deepcopy(P.DEFAULTS)
     P._merge(cfg, yaml.safe_load(Path(a.config).read_text(encoding="utf-8")))
@@ -349,6 +364,7 @@ def main(argv=None):
     else:
         data, profiles = build(cfg, a.top, out)
         cache.write_text(json.dumps({"data": data, "profiles": profiles}, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    attach_monthly(cfg["out"], profiles)
     assemble(data, profiles, out)
     if not a.reassemble and not a.no_tiles:
         tiles.run(cfg["out"])

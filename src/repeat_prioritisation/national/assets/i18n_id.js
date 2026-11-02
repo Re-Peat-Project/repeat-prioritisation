@@ -236,6 +236,7 @@ const ID={
 "KHG under {a} km2, or under the minimum peat area, are not ranked.":"KHG di bawah {a} km2, atau di bawah luas gambut minimum, tidak diberi peringkat.",
 "The default weights are provisional. Canal weights (0.5, 0.3, 0.2) split the single canal weight used before.":"Bobot bawaan masih sementara. Bobot kanal (0,5; 0,3; 0,2) membagi satu bobot kanal yang dipakai sebelumnya.",
 "Scored on 2015 to 2022 without this year's hotspots, the default weights give AUC {a} against hotspots in 2023 to 2025. Fire history alone gives {b}.":"Dinilai pada 2015 sampai 2022 tanpa titik panas tahun ini, bobot bawaan menghasilkan AUC {a} terhadap titik panas 2023 sampai 2025. Riwayat kebakaran saja menghasilkan {b}.",
+"Every KHG has a profile. Rain, deficit, land cover, land status and tenure are shown for the {n} KHG where they have been computed. Generated {d}.":"Setiap KHG punya profil. Curah hujan, defisit, tutupan lahan, status lahan, dan penguasaan lahan ditampilkan untuk {n} KHG yang sudah dihitung. Dibuat {d}.",
 "Profiles cover the top {n} at default weights and the team KHG. Generated {d}.":"Profil mencakup {n} teratas pada bobot bawaan dan KHG tim. Dibuat {d}.",
 "Peat under a licence":"Gambut di bawah izin",
 " · {n} km2 on protected function":" · {n} km2 di fungsi lindung",
@@ -342,5 +343,14 @@ const ID={
 "0 to 1":"0 sampai 1",
 "Drag the handles to choose the months shown on the map.":"Geser kedua pegangan untuk memilih bulan yang ditampilkan di peta.",
 "From month":"Dari bulan",
-"To month":"Sampai bulan"
+"To month":"Sampai bulan",
+"Compare with":"Bandingkan dengan",
+"Hotspots per month and year":"Titik panas per bulan dan tahun",
+"FIRMS VIIRS S-NPP hotspots on peat, nominal and high confidence (high only when the filter is set), counted per month. 2026 to the last day of data. Compared KHG share one colour scale.":"Titik panas FIRMS VIIRS S-NPP di gambut, kepercayaan nominal dan tinggi (hanya tinggi jika filter diatur), dihitung per bulan. 2026 sampai hari terakhir data. KHG pembanding memakai satu skala warna.",
+"Shade follows the square root of the count; 0 is grey.":"Warna mengikuti akar kuadrat jumlah; 0 berwarna abu-abu.",
+"None":"Tidak ada",
+"Ranked at default weights":"Diperingkat pada bobot bawaan",
+"Not ranked":"Tidak diperingkat",
+"No time series for {n}":"Tidak ada deret waktu untuk {n}",
+"Grey bars: how the ranked KHG are spread on this parameter. The marker is this KHG. The ring is the KHG compared.":"Batang abu-abu: sebaran KHG yang diperingkat pada parameter ini. Penanda adalah KHG ini. Cincin adalah KHG pembanding."
 };

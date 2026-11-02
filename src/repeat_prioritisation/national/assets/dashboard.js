@@ -19,7 +19,7 @@ const DEF=PR.map(p=>META.weights[p.id]);
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const clamp01=x=>x<0?0:x>1?1:x;
-const state={w:DEF.slice(),minPeat:META.min_peat,islands:new Set(),missing:"skip",view:"top",sel:null,table:false,conf:"mh"};
+const state={w:DEF.slice(),minPeat:META.min_peat,islands:new Set(),missing:"skip",view:"top",sel:null,cmp:null,table:false,conf:"mh"};
 const onlyHigh=()=>state.conf==="h"&&!!K.n1h;                                    // this year's hotspots: high confidence only
 const val=(k,i)=>onlyHigh()&&PR[k].id==="n1"?K.n1h[i]:K.v[k][i];
 const TOPN=30;
@@ -312,16 +312,29 @@ function renderBump(){
 // ---------------------------------------------------------------- profile
 const profCache={};
 function profData(id){if(profCache[id]!==undefined)return profCache[id];const el=document.getElementById("prof-"+id);return profCache[id]=el?JSON.parse(el.textContent):null}
+// both pickers group the KHG the same way: team, ranked at the default weights, not ranked
+function fillGrouped(sel,ids){
+  const grp=(label,list)=>{if(!list.length)return;const og=document.createElement("optgroup");og.label=label;list.forEach(i=>{const o=document.createElement("option");o.value=K.id[i];o.textContent=K.name[i]+(K.team[i]?" ◆":"");og.appendChild(o)});sel.appendChild(og)};
+  const byRef=(a,b)=>K.ref_rank[a]-K.ref_rank[b],byName=(a,b)=>K.name[a].localeCompare(K.name[b]);
+  grp(t("Team KHG"),ids.filter(i=>K.team[i]).sort((a,b)=>(K.ref_rank[a]??1e9)-(K.ref_rank[b]??1e9)||byName(a,b)));
+  grp(t("Ranked at default weights"),ids.filter(i=>!K.team[i]&&K.ref_rank[i]!=null).sort(byRef));
+  grp(t("Not ranked"),ids.filter(i=>!K.team[i]&&K.ref_rank[i]==null).sort(byName));
+}
 function fillPick(){
   const sel=$("#p-pick");sel.innerHTML='<option value="" disabled>'+esc(t("No profile for the selected KHG"))+'</option>';
-  const grp=(label,ids)=>{if(!ids.length)return;const og=document.createElement("optgroup");og.label=label;ids.forEach(i=>{const o=document.createElement("option");o.value=K.id[i];o.textContent=K.name[i]+(K.team[i]?" ◆":"");og.appendChild(o)});sel.appendChild(og)};
-  const withProf=[];for(let i=0;i<N;i++)if(K.has[i])withProf.push(i);
-  const team=withProf.filter(i=>K.team[i]),rest=withProf.filter(i=>!K.team[i]).sort((a,b)=>(K.ref_rank[a]||1e9)-(K.ref_rank[b]||1e9));
-  grp(t("Team KHG"),team.sort((a,b)=>(K.ref_rank[a]||1e9)-(K.ref_rank[b]||1e9)));grp(t("Top at default weights"),rest);
+  fillGrouped(sel,d3.range(N).filter(i=>K.has[i]));
   sel.onchange=()=>select(sel.value);
   const i0=K.id.indexOf(state.sel);sel.value=i0>=0&&K.has[i0]?state.sel:"";
+  fillCmp();
 }
-function select(id){state.sel=id;const i=K.id.indexOf(id);$("#p-pick").value=K.has[i]?id:"";render(true);renderProfile();history.replaceState(null,"",hashState())}
+// the KHG to compare with: any KHG; the time series need a profile, the tiles and strips do not
+function fillCmp(){
+  const sel=$("#p-cmp");sel.innerHTML='<option value="">'+esc(t("None"))+'</option>';
+  fillGrouped(sel,d3.range(N));
+  sel.value=state.cmp||"";
+  sel.onchange=()=>{state.cmp=sel.value&&sel.value!==state.sel?sel.value:null;sel.value=state.cmp||"";renderProfile();history.replaceState(null,"",hashState())};
+}
+function select(id){state.sel=id;if(state.cmp===id){state.cmp=null;$("#p-cmp").value=""}const i=K.id.indexOf(id);$("#p-pick").value=K.has[i]?id:"";render(true);renderProfile();history.replaceState(null,"",hashState())}
 function hsTile(i,info){
   if(!info||info.hs_now==null)return [t("n/a"),t("Hotspots this year")];
   if(!onlyHigh())return [fmt(info.hs_now,0),info.rank_now?t("Hotspots this year · #{a} by density, #{b} by count",{a:info.rank_now,b:info.rank_now_n}):t("Hotspots this year")];
@@ -330,6 +343,16 @@ function hsTile(i,info){
   return [fmt(K.n1hn[i],0),t("High-confidence hotspots this year · #{a} by density, #{b} by count",{a:rk(K.n1h),b:rk(K.n1hn)})];
 }
 function chip(tx){return `<span class="chip">${esc(tx)}</span>`}
+const shortName=i=>K.name[i].replace(/Sungai /g,"");
+// the compared KHG's value for each KPI tile (same order as the tiles); n/a where only a profile has the number
+function cmpVals(i,Q){
+  const na=t("n/a"),info=Q?Q.info:null,r=R.rank[i];
+  const v=[r?"#"+r:na,isFinite(R.score[i])?fx(R.score[i],2):na,`${fmt(K.peat[i],0)} km2`,
+    onlyHigh()?fmt(K.n1hn[i],0):(info&&info.hs_now!=null?fmt(info.hs_now,0):na),
+    Q?(info&&info.tma_n?Math.round(info.tma_deep*100)+"%":t("none")):na,
+    `${confChar[K.conf[i]]} ${t(confName[K.conf[i]])}`];
+  const sh=(()=>{if(!Q||!Q.ov)return [na,na];const pt=d3.sum(Q.ov.s.forest||[],x=>x[2]),la=(Q.ov.s.licence_any||[[0,0,0]])[0][2],dm=(Q.ov.s.dmpg||[[0,0,0]])[0][2];return [`${pt?Math.round(100*la/pt):0}%`,`${pt?Math.round(100*dm/pt):0}%`]})();
+  return v.concat(sh)}
 function renderProfile(){
   const id=state.sel;if(!id)return;const i=K.id.indexOf(id),P=profData(id);
   $("#p-name").textContent=K.name[i];
@@ -355,39 +378,50 @@ function renderProfile(){
     const dm=(P.ov.s.dmpg||[[0,0,0]])[0][2];
     tiles.push([`${pt?Math.round(100*dm/pt):0}<small>%</small>`,t("Peat in DMPG villages")+(P.info.dmpg?t(" · {n} villages, {a} km2 of village land",{n:P.info.dmpg,a:fmt(P.info.dmpg_km2,0)}):"")]);
     tileTips.push(t("Share of the KHG's peat inside a DMPG village of the SiTMAT layer. Below it: villages whose centre lies in the KHG and the village land inside it."))}
-  $("#p-kpis").innerHTML=tiles.map((tl,j)=>`<div class="kpi"${tipAttr(tileTips[j])}><div class="v">${tl[0]}</div><div class="l">${tl[1]}</div></div>`).join("");
-  renderStrips(i);
+  const ic=state.cmp?K.id.indexOf(state.cmp):-1,Q=ic>=0?profData(state.cmp):null,cv=ic>=0?cmpVals(ic,Q):[];
+  $("#p-kpis").innerHTML=tiles.map((tl,j)=>`<div class="kpi"${tipAttr(tileTips[j])}><div class="v">${tl[0]}</div><div class="l">${tl[1]}</div>${cv[j]!=null?`<div class="c" title="${esc(K.name[ic])}"><i></i><span>${esc(shortName(ic))}</span><b>${cv[j]}</b></div>`:""}</div>`).join("");
+  renderStrips(i,ic);
   $("#p-ov-panel").innerHTML="";
   const charts=$("#p-charts");charts.innerHTML="";
   if(!P){charts.innerHTML=`<p class="hint">${t("No detailed profile for this KHG. The profiles cover the top {n} at default weights and the team KHG.",{n:META.top_n})}</p>`;drawMap(null);$("#p-table").innerHTML="";return}
+  renderOv(P);                                // before the charts: the panel decides the column widths they are drawn in
+  const cmpP=Q?{names:[K.name[i],K.name[ic]]}:{};
+  const sr=f=>Q?{cmp:f(Q),...cmpP}:{};          // the compared KHG's series, when it has a profile
+  const monthly=(PP)=>onlyHigh()?PP.now_m.map(m=>[m[0],PP.lay.now.filter(p=>p[2]===m[0]&&p[3]&&p[4]).length]):PP.now_m.map(m=>[m[0],m[1]]);
+  const hw=!!(P.hm&&Q&&Q.hm);      // the month-by-year maps share a row when two KHG are compared
   const mk=(title,tip,wide)=>{const d=document.createElement("div");d.className="ch"+(wide?" wide":"");d.innerHTML=`<h3 class="hasTip"${tipAttr(t(tip))}>${t(title)}</h3><div></div>`;charts.appendChild(d);return d.lastChild};
-  lineChart(mk("Burned, % of peat per year","Burnt-area polygons, 2015 to 2026: the share of the KHG's peat burned in each year. 2026 is a partial year, drawn dashed."),{data:P.burned,color:"--hist",partial:2026,unit:"%",nd:1,ticks:[2015,2020,2025]});
-  lineChart(mk("Hotspots on peat per year, VIIRS","FIRMS VIIRS S-NPP vegetation-fire hotspots that fall on peat, nominal and high confidence, per year."),{data:P.hs,color:"--hist",unit:"",nd:0,ticks:[2012,2016,2020,2024]});
-  lineChart(mk("Hotspots this year by month","MODIS hotspots on peat in each month of this year, medium and high confidence (high only when the filter is set).",true),{data:onlyHigh()?P.now_m.map(m=>[m[0],P.lay.now.filter(p=>p[2]===m[0]&&p[3]&&p[4]).length]):P.now_m.map(m=>[m[0],m[1]]),color:"--now",unit:"",nd:0,ticks:(h=>[...[1,4,7,10].filter(x=>x<=h),...([1,4,7,10].includes(h)?[]:[h])])(Math.max(...P.now_m.map(m=>m[0]))),tickFmt:m=>mon(m),xdom:[1,Math.max(...P.now_m.map(m=>m[0]))]});
-  lineChart(mk("Dry-season water deficit, mm","TerraClimate climatic water deficit summed over the dry months (June to October), in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.deficit,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
-  lineChart(mk("Rain June to October, mm","TerraClimate rainfall in the dry months, in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.rain,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021]});
-  landBar(mk("Land cover","ESA WorldCover classes sampled at 250 m. Open land is grass, shrub, crop, built and bare. Shown for context, not scored.",true),P.lc);
-  renderOv(P);
-  drawMap(P);
-  renderDataTable(P);
+  lineChart(mk("Burned, % of peat per year","Burnt-area polygons, 2015 to 2026: the share of the KHG's peat burned in each year. 2026 is a partial year, drawn dashed."),{data:P.burned,color:"--hist",partial:2026,unit:"%",nd:1,ticks:[2015,2020,2025],...sr(x=>x.burned)});
+  lineChart(mk("Hotspots on peat per year, VIIRS","FIRMS VIIRS S-NPP vegetation-fire hotspots that fall on peat, nominal and high confidence, per year."),{data:P.hs,color:"--hist",unit:"",nd:0,ticks:[2012,2016,2020,2024],...sr(x=>x.hs)});
+  lineChart(mk("Hotspots this year by month","MODIS hotspots on peat in each month of this year, medium and high confidence (high only when the filter is set).",hw),{data:monthly(P),...sr(monthly),color:"--now",unit:"",nd:0,ticks:(h=>[...[1,4,7,10].filter(x=>x<=h),...([1,4,7,10].includes(h)?[]:[h])])(Math.max(...P.now_m.map(m=>m[0]))),tickFmt:m=>mon(m),xdom:[1,Math.max(...P.now_m.map(m=>m[0]))]});
+  if(P.hm)heatMap(mk("Hotspots per month and year","FIRMS VIIRS S-NPP hotspots on peat, nominal and high confidence (high only when the filter is set), counted per month. 2026 to the last day of data. Compared KHG share one colour scale.",hw),[{name:K.name[i],hm:P.hm},...(hw?[{name:K.name[ic],hm:Q.hm}]:[])]);
+  if(P.deficit.length)lineChart(mk("Dry-season water deficit, mm","TerraClimate climatic water deficit summed over the dry months (June to October), in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.deficit,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021],...sr(x=>x.deficit)});
+  if(P.rain.length)lineChart(mk("Rain June to October, mm","TerraClimate rainfall in the dry months, in mm. About 4 km resolution, 2015 to 2021. Shown for context, not scored."),{data:P.rain,color:"--ink2",unit:" mm",nd:0,ticks:[2015,2018,2021],...sr(x=>x.rain)});
+  {const lh=mk("Land cover","ESA WorldCover classes sampled at 250 m. Open land is grass, shrub, crop, built and bare. Shown for context, not scored.");
+    if(!P.lc.length)lh.parentNode.remove();else if(Q&&Q.lc.length){landBar(lh,P.lc,{cap:K.name[i]});landBar(lh,Q.lc,{cap:K.name[ic],append:true})}else landBar(lh,P.lc)}
+  if(ic>=0&&!Q)charts.insertAdjacentHTML("afterbegin",`<p class="hint nocmp">${t("No time series for {n}",{n:esc(K.name[ic])})}</p>`);
+  drawMap(P,cmpProf());
+  renderDataTable(P,Q);
   if(P.ov)$("#p-table").insertAdjacentHTML("beforeend",ovTable(P));
 }
-function renderDataTable(P){
-  const yrs=[...new Set([...P.burned.map(d=>d[0]),...P.hs.map(d=>d[0]),...P.deficit.map(d=>d[0])])].sort();
-  const get=(a,y)=>{const f=a.find(d=>d[0]===y);return f?f[1]:""};
-  $("#p-table").innerHTML=`<table><thead><tr><th>${t("Year")}</th><th></th><th></th><th${tipAttr(t("Burnt-area polygons. Share of the KHG's peat burned in the year, in %."))}>${t("Burned % of peat")}</th><th${tipAttr(t("FIRMS VIIRS S-NPP hotspots on peat, count."))}>${t("Hotspots VIIRS")}</th><th${tipAttr(t("TerraClimate dry-season water deficit, mm."))}>${t("Deficit mm")}</th><th${tipAttr(t("TerraClimate rainfall June to October, mm."))}>${t("Rain Jun-Oct mm")}</th></tr></thead><tbody>${yrs.map(y=>`<tr><td>${y}</td><td></td><td></td><td>${get(P.burned,y)}</td><td>${get(P.hs,y)}</td><td>${get(P.deficit,y)}</td><td>${get(P.rain,y)}</td></tr>`).join("")}</tbody></table>
-  <table style="margin-top:10px"><thead><tr><th>${t("Month 2026")}</th><th></th><th></th><th${tipAttr(t("MODIS hotspots on peat, medium and high confidence, count."))}>${t("On peat")}</th><th${tipAttr(t("The same hotspots anywhere in the KHG, count."))}>${t("In KHG")}</th></tr></thead><tbody>${P.now_m.map(m=>`<tr><td>${mon(m[0])}</td><td></td><td></td><td>${m[1]}</td><td>${m[2]}</td></tr>`).join("")}</tbody></table>`;
+function renderDataTable(P,Q){
+  const cap=n=>Q?`<caption>${esc(n)}</caption>`:"";
+  const yearTable=(PP,name)=>{
+    const yrs=[...new Set([...PP.burned.map(d=>d[0]),...PP.hs.map(d=>d[0]),...PP.deficit.map(d=>d[0])])].sort();
+    const get=(a,y)=>{const f=a.find(d=>d[0]===y);return f?f[1]:"–"};
+    return `<table class="dt">${cap(name)}<thead><tr><th>${t("Year")}</th><th${tipAttr(t("Burnt-area polygons. Share of the KHG's peat burned in the year, in %."))}>${t("Burned % of peat")}</th><th${tipAttr(t("FIRMS VIIRS S-NPP hotspots on peat, count."))}>${t("Hotspots VIIRS")}</th><th${tipAttr(t("TerraClimate dry-season water deficit, mm."))}>${t("Deficit mm")}</th><th${tipAttr(t("TerraClimate rainfall June to October, mm."))}>${t("Rain Jun-Oct mm")}</th></tr></thead><tbody>${yrs.map(y=>`<tr><td>${y}</td><td>${get(PP.burned,y)}</td><td>${get(PP.hs,y)}</td><td>${get(PP.deficit,y)}</td><td>${get(PP.rain,y)}</td></tr>`).join("")}</tbody></table>`};
+  const month=`<table class="dt">${cap(K.name[K.id.indexOf(state.sel)])}<thead><tr><th>${t("Month 2026")}</th><th${tipAttr(t("MODIS hotspots on peat, medium and high confidence, count."))}>${t("On peat")}</th><th${tipAttr(t("The same hotspots anywhere in the KHG, count."))}>${t("In KHG")}</th></tr></thead><tbody>${P.now_m.map(m=>`<tr><td>${mon(m[0])}</td><td>${m[1]}</td><td>${m[2]}</td></tr>`).join("")}</tbody></table>`;
+  $("#p-table").innerHTML=yearTable(P,K.name[K.id.indexOf(state.sel)])+(Q?yearTable(Q,K.name[K.id.indexOf(state.cmp)]):"")+month;
 }
 
 // strip plots: where this KHG sits among the ranked KHG, per parameter
-function renderStrips(i){
-  const host=$("#p-strips");host.innerHTML="";
+function renderStrips(i,ic=-1){
+  const host=$("#p-strips");host.innerHTML="";host.classList.toggle("cmp",ic>=0);
   PR.forEach((p,k)=>{
     const vals=[];for(let j=0;j<N;j++)if(R.elig[j]){const v=val(k,j);if(v!=null&&isFinite(v))vals.push(v)}
     vals.sort(d3.ascending);const v=val(k,i);
     const row=document.createElement("div");row.className="strip";
     const w0=state.w[k];
-    row.innerHTML=`<span class="t hasTip"${tipAttr(paramTip(p))}>${t(p.label)}<b>w ${fmt(w0,1)}</b></span><svg${tipAttr(t("Grey bars: how the ranked KHG are spread on this parameter. The marker is this KHG."))}></svg><span class="n"></span>`;host.appendChild(row);
+    row.innerHTML=`<span class="t hasTip"${tipAttr(paramTip(p))}>${t(p.label)}<b>w ${fmt(w0,1)}</b></span><svg${tipAttr(t(ic>=0?"Grey bars: how the ranked KHG are spread on this parameter. The marker is this KHG. The ring is the KHG compared.":"Grey bars: how the ranked KHG are spread on this parameter. The marker is this KHG."))}></svg><span class="n"></span>`;host.appendChild(row);
     const svg=d3.select(row.querySelector("svg"));const W=row.querySelector("svg").clientWidth||240;svg.attr("viewBox",`0 0 ${W} 22`);
     if(vals.length<2){row.querySelector(".n").textContent=t("n/a");return}
     const lo=d3.quantileSorted(vals,.02),hi=d3.quantileSorted(vals,.98),x=d3.scaleLinear([lo,Math.max(hi,lo+1e-9)],[4,W-4]).clamp(true);
@@ -397,42 +431,90 @@ function renderStrips(i){
     const n=row.querySelector(".n");
     if(v==null||!isFinite(v)){n.innerHTML=`<small>${t("not mapped")}</small>`;n.dataset.tip=t("No canal of this class is mapped in the layer for this KHG.");return}
     const pct=Math.round(100*d3.bisectLeft(vals,v)/vals.length);
+    let cmpTip="";
+    if(ic>=0){const vc=val(k,ic);
+      if(vc!=null&&isFinite(vc)){
+        svg.append("line").attr("x1",x(vc)).attr("x2",x(vc)).attr("y1",2).attr("y2",20).attr("stroke",css("--cmp")).attr("stroke-width",2);
+        svg.append("circle").attr("cx",x(vc)).attr("cy",4).attr("r",4.5).attr("fill",css("--surface")).attr("stroke",css("--cmp")).attr("stroke-width",2.2);
+        n.dataset.cv=`${fmt(vc,vc<10?2:1)}`;cmpTip=`<br><b>${esc(K.name[ic])}</b> ${fmt(vc,3)} <span>${esc(t(p.unit))} · p${Math.round(100*d3.bisectLeft(vals,vc)/vals.length)}</span>`}
+      else{n.dataset.cv=t("not mapped");cmpTip=`<br><b>${esc(K.name[ic])}</b> <span>${t("not mapped")}</span>`}}
     svg.append("line").attr("x1",x(v)).attr("x2",x(v)).attr("y1",2).attr("y2",20).attr("stroke",`var(${GROUPS[p.group].css})`).attr("stroke-width",2);
     svg.append("circle").attr("cx",x(v)).attr("cy",4).attr("r",4.5).attr("fill",`var(${GROUPS[p.group].css})`).attr("stroke",css("--surface")).attr("stroke-width",2);
-    n.innerHTML=`${fmt(v,v<10?2:1)} <small>p${pct}</small>`;n.dataset.tip=`<b>${esc(t(p.label))}</b><br>${fmt(v,3)} <span>${esc(t(p.unit))}</span><br><span>${t("p{pct}: higher than {pct}% of the ranked KHG.",{pct})}</span>`;
+    n.innerHTML=`${fmt(v,v<10?2:1)} <small>p${pct}</small>`+(n.dataset.cv?`<span class="cv"><i></i>${n.dataset.cv}</span>`:"");n.dataset.tip=`<b>${esc(t(p.label))}</b><br>${esc(K.name[i])} ${fmt(v,3)} <span>${esc(t(p.unit))}</span><br><span>${t("p{pct}: higher than {pct}% of the ranked KHG.",{pct})}</span>${cmpTip}`;
   });
 }
 
-// line chart: thin line, hairline grid, end marker, hover crosshair
+// line chart: thin line, hairline grid, end marker, hover crosshair; o.cmp adds the compared KHG as a second line (o.names: [selected, compared])
 function lineChart(host,o){
-  const W=host.clientWidth||300,H=128,m={l:34,r:14,t:8,b:20};host.innerHTML="";
+  const B=o.cmp&&o.cmp.length?o.cmp:null,W=host.clientWidth||300,H=128,m={l:34,r:B?84:14,t:8,b:20};host.innerHTML="";
   if(!o.data||!o.data.length){host.innerHTML=`<p class="hint">${t("No data")}</p>`;return}
   const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("height",H);
-  const xs=o.data.map(d=>d[0]),x=d3.scaleLinear(o.xdom||[d3.min(xs),d3.max(xs)],[m.l,W-m.r]);
-  const ymax=d3.max(o.data,d=>d[1])||1,y=d3.scaleLinear([0,ymax*1.08],[H-m.b,m.t]).nice(3);
-  const col=css(o.color);
+  const both=B?o.data.concat(B):o.data,xs=both.map(d=>d[0]),x=d3.scaleLinear(o.xdom||[d3.min(xs),d3.max(xs)],[m.l,W-m.r]);
+  const ymax=d3.max(both,d=>d[1])||1,y=d3.scaleLinear([0,ymax*1.08],[H-m.b,m.t]).nice(3);
+  const col=css(o.color),ccol=css("--cmp");
   svg.append("g").attr("class","gridl").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(3).tickSize(-(W-m.l-m.r)).tickFormat(""));
   svg.append("g").attr("class","axis").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(3).tickSize(0).tickPadding(6).tickFormat(v=>fmt(v,v<10&&v%1?1:0)));
   svg.select(".axis path").remove();
   svg.append("g").attr("class","axis").attr("transform",`translate(0,${H-m.b})`).call(d3.axisBottom(x).tickValues(o.ticks||x.ticks(4)).tickFormat(o.tickFmt||d3.format("d")).tickSize(3));
-  const full=o.partial?o.data.filter(d=>d[0]<o.partial):o.data;
   const line=d3.line().x(d=>x(d[0])).y(d=>y(d[1]));
-  svg.append("path").datum(full).attr("d",d3.area().x(d=>x(d[0])).y0(y(0)).y1(d=>y(d[1]))).attr("fill",col).attr("opacity",.1);
-  svg.append("path").datum(full).attr("d",line).attr("fill","none").attr("stroke",col).attr("stroke-width",2).attr("stroke-linejoin","round").attr("stroke-linecap","round");
-  if(o.partial){const pi=o.data.findIndex(d=>d[0]===o.partial);if(pi>0){svg.append("path").datum([o.data[pi-1],o.data[pi]]).attr("d",line).attr("fill","none").attr("stroke",col).attr("stroke-width",2).attr("stroke-dasharray","3 3")}
-    const pd=o.data[pi];if(pd)svg.append("circle").attr("cx",x(pd[0])).attr("cy",y(pd[1])).attr("r",4).attr("fill",css("--surface")).attr("stroke",col).attr("stroke-width",2)}
-  const last=full[full.length-1];
-  svg.append("circle").attr("cx",x(last[0])).attr("cy",y(last[1])).attr("r",4).attr("fill",col).attr("stroke",css("--surface")).attr("stroke-width",2);
+  // one series: filled area (selected only), line, dashed last partial year, end marker
+  const draw=(data,c,area)=>{
+    const full=o.partial?data.filter(d=>d[0]<o.partial):data;if(!full.length)return null;
+    if(area)svg.append("path").datum(full).attr("d",d3.area().x(d=>x(d[0])).y0(y(0)).y1(d=>y(d[1]))).attr("fill",c).attr("opacity",.1);
+    svg.append("path").datum(full).attr("d",line).attr("fill","none").attr("stroke",c).attr("stroke-width",2).attr("stroke-linejoin","round").attr("stroke-linecap","round");
+    if(o.partial){const pi=data.findIndex(d=>d[0]===o.partial);if(pi>0)svg.append("path").datum([data[pi-1],data[pi]]).attr("d",line).attr("fill","none").attr("stroke",c).attr("stroke-width",2).attr("stroke-dasharray","3 3");
+      const pd=data[pi];if(pd)svg.append("circle").attr("cx",x(pd[0])).attr("cy",y(pd[1])).attr("r",4).attr("fill",css("--surface")).attr("stroke",c).attr("stroke-width",2)}
+    const last=full[full.length-1];
+    svg.append("circle").attr("cx",x(last[0])).attr("cy",y(last[1])).attr("r",4).attr("fill",c).attr("stroke",css("--surface")).attr("stroke-width",2);
+    return data[data.length-1]};
+  if(B)draw(B,ccol,false);
+  const endA=draw(o.data,col,true);
+  if(B&&o.names){   // direct labels at the line ends, pushed apart when they would touch
+    const ends=[[endA,o.names[0],col],[B[B.length-1],o.names[1],ccol]].map(([d,n,c])=>{n=n.replace(/Sungai /g,"").split(" - ")[0];return {y:y(d[1]),n:n.length>12?n.slice(0,11)+"…":n,c}});
+    if(Math.abs(ends[0].y-ends[1].y)<12){const mid=(ends[0].y+ends[1].y)/2,up=ends[0].y<=ends[1].y?0:1;ends[up].y=mid-6;ends[1-up].y=mid+6}
+    svg.append("g").selectAll("text").data(ends).join("text").attr("x",W-m.r+16).attr("y",d=>d.y+4).attr("fill",css("--ink2")).attr("font-size",11).text(d=>d.n)}
   const mx=d3.maxIndex(o.data,d=>d[1]),pk=o.data[mx];
-  if(pk&&pk[1]>0)svg.append("text").attr("x",Math.min(W-m.r-2,Math.max(m.l+2,x(pk[0]))) ).attr("y",y(pk[1])-5).attr("text-anchor",x(pk[0])>W-60?"end":x(pk[0])<m.l+30?"start":"middle").attr("fill",css("--ink2")).attr("font-size",11).text(fmt(pk[1],o.nd)+o.unit);
+  if(!B&&pk&&pk[1]>0)svg.append("text").attr("x",Math.min(W-m.r-2,Math.max(m.l+2,x(pk[0]))) ).attr("y",y(pk[1])-5).attr("text-anchor",x(pk[0])>W-60?"end":x(pk[0])<m.l+30?"start":"middle").attr("fill",css("--ink2")).attr("font-size",11).text(fmt(pk[1],o.nd)+o.unit);
   const dot=svg.append("circle").attr("r",4.5).attr("fill",col).attr("stroke",css("--surface")).attr("stroke-width",2).style("display","none");
-  const step=(W-m.l-m.r)/Math.max(1,o.data.length-1);
-  svg.append("g").selectAll("rect").data(o.data).join("rect").attr("x",d=>x(d[0])-step/2).attr("width",step).attr("y",m.t).attr("height",H-m.t-m.b).attr("fill","transparent")
-    .on("mousemove",(e,d)=>{dot.style("display",null).attr("cx",x(d[0])).attr("cy",y(d[1]));showTip(`<b>${o.tickFmt?o.tickFmt(d[0]):d[0]}${o.partial&&d[0]===o.partial?" "+t("(partial year)"):""}</b><br>${fmt(d[1],o.nd)}${o.unit}`,e)})
-    .on("mouseleave",()=>{dot.style("display","none");hideTip()});
+  const dotB=B?svg.append("circle").attr("r",4.5).attr("fill",ccol).attr("stroke",css("--surface")).attr("stroke-width",2).style("display","none"):null;
+  const years=[...new Set(both.map(d=>d[0]))].sort((p,q)=>p-q),step=(W-m.l-m.r)/Math.max(1,years.length-1);
+  const at=(a,yr)=>a.find(d=>d[0]===yr);
+  svg.append("g").selectAll("rect").data(years).join("rect").attr("x",yr=>x(yr)-step/2).attr("width",step).attr("y",m.t).attr("height",H-m.t-m.b).attr("fill","transparent")
+    .on("mousemove",(e,yr)=>{const a=at(o.data,yr),b=B?at(B,yr):null;
+      dot.style("display",a?null:"none");if(a)dot.attr("cx",x(yr)).attr("cy",y(a[1]));
+      if(dotB){dotB.style("display",b?null:"none");if(b)dotB.attr("cx",x(yr)).attr("cy",y(b[1]))}
+      const row=(nm,d)=>d?(B?`${esc(nm)} `:"")+`${fmt(d[1],o.nd)}${o.unit}`:null;
+      showTip(`<b>${o.tickFmt?o.tickFmt(yr):yr}${o.partial&&yr===o.partial?" "+t("(partial year)"):""}</b>`+[row(o.names&&o.names[0],a),B?row(o.names[1],b):null].filter(Boolean).map(r=>"<br>"+r).join(""),e)})
+    .on("mouseleave",()=>{dot.style("display","none");if(dotB)dotB.style("display","none");hideTip()});
 }
-function landBar(host,lc){
-  const W=host.clientWidth||300,H=26;host.innerHTML="";if(!lc||!lc.length){host.innerHTML=`<p class="hint">${t("No data")}</p>`;return}
+// month-by-year heat map of hotspots on peat: one grid per KHG, one colour scale across the grids; the square root of the count sets the shade
+const HEAT={light:["#f6f0e8","#fdcc8a","#fc8d59","#e34a33","#7f0000"],dark:["#6a4429","#a45a2a","#d06d2f","#ee8650","#ffd2a8"]};
+function heatMap(host,items){
+  host.innerHTML="";const high=onlyHigh(),ramp=HEAT[isDark()?"dark":"light"],mlab=(LANG==="id"?MONTHS_ID:MONTHS_EN).map(m=>m[0]);
+  const yrs=items.flatMap(it=>it.hm.map(r=>r[0])),y0=2012,y1=Math.max(d3.max(yrs)||y0,META.period_now?new Date(META.period_now).getFullYear():y0),years=d3.range(y0,y1+1);
+  const maps=items.map(it=>{const m=new Map();for(const [y,mo,nm,nh] of it.hm)m.set(y*100+mo,high?nh:nm+nh);return m});
+  const mx=Math.max(1,...maps.flatMap(m=>[...m.values()]));
+  const color=n=>n<=0?css("--none"):ramp[Math.min(ramp.length-1,1+Math.floor(Math.sqrt(n/mx)*(ramp.length-1.001)))];
+  const cw=22,ch=14,l=34,tp=14,W=l+cw*12,H=tp+ch*years.length+4,cur=y1;
+  const row=document.createElement("div");row.className="hmrow";host.appendChild(row);
+  items.forEach((it,k)=>{
+    const box=document.createElement("div");box.className="hm";row.appendChild(box);
+    if(items.length>1)box.insertAdjacentHTML("beforeend",`<div class="lc-cap">${esc(it.name)}</div>`);
+    const svg=d3.select(box).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("role","img").attr("aria-label",t("Hotspots per month and year")+" "+it.name);
+    mlab.forEach((m,j)=>svg.append("text").attr("x",l+cw*j+cw/2).attr("y",10).attr("text-anchor","middle").attr("font-size",9).attr("fill",css("--muted")).text(m));
+    years.forEach((y,r)=>{
+      svg.append("text").attr("x",l-4).attr("y",tp+ch*r+ch-3).attr("text-anchor","end").attr("font-size",9).attr("fill",css(y===cur?"--ink":"--muted")).attr("font-weight",y===cur?700:400).text(y);
+      for(let j=0;j<12;j++){const n=maps[k].get(y*100+j+1)||0;
+        svg.append("rect").attr("x",l+cw*j+1).attr("y",tp+ch*r+1).attr("width",cw-2).attr("height",ch-2).attr("rx",2).attr("fill",color(n))
+          .on("mousemove",e=>showTip(`<b>${monf(j+1)} ${y}</b><br>${items.length>1?esc(it.name)+" ":""}${fmt(n,0)}`,e)).on("mouseleave",hideTip)}});
+  });
+  const lg=document.createElement("div");lg.className="hmleg";lg.dataset.tip=t("Shade follows the square root of the count; 0 is grey.");
+  lg.innerHTML=`<span>0</span><span class="ramp" style="background:linear-gradient(90deg,${ramp.join(",")})"></span><span>${fmt(mx,0)}</span>`;host.appendChild(lg);
+}
+function landBar(host,lc,opt={}){
+  const W=host.clientWidth||300,H=26;if(!opt.append)host.innerHTML="";
+  if(opt.cap)host.insertAdjacentHTML("beforeend",`<div class="lc-cap">${esc(opt.cap)}</div>`);
+  if(!lc||!lc.length){host.insertAdjacentHTML("beforeend",`<p class="hint">${t("No data")}</p>`);return}
   const bucket={Tree:"Tree",Wetland:"Wetland, water",Water:"Wetland, water",Mangrove:"Wetland, water"};
   const cols={"Tree":"#008300","Open land":isDark()?"#c98500":"#eda100","Wetland, water":isDark()?"#9085e9":"#6250d6"};
   const agg={};lc.forEach(([n,v])=>{const b=bucket[n]||"Open land";agg[b]=(agg[b]||0)+v});
@@ -446,13 +528,15 @@ function landBar(host,lc){
 }
 
 // map of one KHG: burn counts, canals by class, this year's hotspot points, on the basemap
-let pmap=null,pReady=false,pPending=undefined;
+// two map slots: the selected KHG and, when one is chosen, the KHG compared; layer toggles and filters apply to both
+const PS=[{id:"p-map",m:null,ready:false,pending:undefined},{id:"p-map2",m:null,ready:false,pending:undefined}];
+const cmpProf=()=>state.cmp?profData(state.cmp):null;
 const SAT_URL="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",SAT_CREDIT="Imagery: Esri, Maxar, Earthstar Geographics, and the GIS User Community";
 let pSat=false;
 const pLayers={peat:true,burn:true,p:true,s:true,t:true,now:true};
 const EMPTY={type:"FeatureCollection",features:[]};
 const pOv={mode:"off",vil:false,dmpg:false};
-const TILES_URL="khg_layers.pmtiles";                                              // the map layers of the profiled KHG, next to this page
+const tilesUrl=id=>"pmtiles://khg_tiles/"+id+".pmtiles";                          // the map layers of one KHG: one archive per KHG, in khg_tiles/ next to this page
 const TILE_LAYERS=["p-peat","p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-lic-line","p-ov-ring","p-ov-vil","p-ov-vil-f","p-ov-dmpg","p-ov-dmpg-line"];
 const pNow={a:1,b:12,high:false};                                                 // map-only filter on this year's hotspots: month range and confidence
 let nowLab=null;
@@ -462,7 +546,8 @@ function nowCount(P){
   if(all&&!hi&&L.now_total)return L.now_total;
   const n=L.now.filter(p=>p[2]>=pNow.a&&p[2]<=pNow.b&&(!hi||p[3])).length;
   return (!hi&&L.now_total>L.now.length)?"≥ "+n:n}
-function setNowLab(){if(nowLab&&pPending)nowLab.s.innerHTML=nowLab.ic+t(nowLab.tx,{n:nowCount(pPending)})}
+function nowCounts(){const a=PS[0].pending,b=PS[1].pending;return a?nowCount(a)+(b&&!PS[1].hidden?" · "+nowCount(b):""):""}
+function setNowLab(){if(nowLab&&PS[0].pending)nowLab.s.innerHTML=nowLab.ic+t(nowLab.tx,{n:nowCounts()})}
 function nowFilter(){const rng=[["all"],[">=",["get","m"],pNow.a],["<=",["get","m"],pNow.b]];
   return {m:["all",["==",["get","h"],0],...rng.slice(1)],h:["all",["==",["get","h"],1],...rng.slice(1)]}}
 const OVCLS={
@@ -480,28 +565,29 @@ function ovColor(layer,c){
   return (map[layer]||{})[c]||n}
 const ovMatch=layer=>["match",["get","c"],...OVCLS[layer].flatMap(([c])=>[c,ovColor(layer,c)]),ovColor(layer,"none")];
 const ovTip={off:"Hide the land-status layers.",forest:"Forest area function 2023 (Kawasan Hutan, 1:250,000).",feg:"Peat ecosystem function 2017 (FEG): protected or cultivation.",licence:"Business licences, 2025 update. Hover for the holder.",ring:"Licences and the land within 5 km of one but inside none: the zone the Bluebook 2026 calls Buffer 5 Kilometer."};
-function pTheme(){
-  if(!pmap||!pReady)return;
+function pTheme(S){
+  const m=S.m;if(!m||!S.ready)return;
   const ramp=d3.interpolateRgb(css("--ramp0"),css("--ramp1")),on=css("--now"),sf=css("--surface");
-  {const br=d3.interpolateRgb(css("--burn0"),css("--burn1"));pmap.setPaintProperty("p-burn","fill-color",["match",["get","n"],1,br(0),2,br(.35),3,br(.7),br(1)])}
-  for(const id of ["p-canal-p","p-canal-s","p-canal-t"])pmap.setPaintProperty(id,"line-color",css("--canal"));
-  pmap.setPaintProperty("p-outline","line-color",css("--ink"));pmap.setPaintProperty("p-peat","fill-color",css("--peat"));
-  pmap.setPaintProperty("p-ov-forest","fill-color",ovMatch("forest"));pmap.setPaintProperty("p-ov-feg","fill-color",ovMatch("feg"));
-  pmap.setPaintProperty("p-ov-lic","fill-color",ovMatch("licence"));pmap.setPaintProperty("p-ov-ring","fill-color",ovMatch("ring"));pmap.setPaintProperty("p-ov-lic-line","line-color",ovMatch("licence"));
-  pmap.setPaintProperty("p-ov-vil","line-color",ovColor("village","in"));pmap.setPaintProperty("p-ov-vil-f","fill-color",ovColor("village","in"));pmap.setPaintProperty("p-ov-dmpg","fill-color",ovColor("dmpg","in"));pmap.setPaintProperty("p-ov-dmpg-line","line-color",ovColor("dmpg","in"));
-  for(const id of ["p-now-h","p-now-m"]){pmap.setPaintProperty(id,"circle-color",["case",["==",["get","p"],1],on,"rgba(0,0,0,0)"]);pmap.setPaintProperty(id,"circle-stroke-color",["case",["==",["get","p"],1],sf,on]);pmap.setPaintProperty(id,"circle-stroke-width",["case",["==",["get","p"],1],.8,1.4])}
+  {const br=d3.interpolateRgb(css("--burn0"),css("--burn1"));m.setPaintProperty("p-burn","fill-color",["match",["get","n"],1,br(0),2,br(.35),3,br(.7),br(1)])}
+  for(const id of ["p-canal-p","p-canal-s","p-canal-t"])m.setPaintProperty(id,"line-color",css("--canal"));
+  m.setPaintProperty("p-outline","line-color",css("--ink"));m.setPaintProperty("p-peat","fill-color",css("--peat"));
+  m.setPaintProperty("p-ov-forest","fill-color",ovMatch("forest"));m.setPaintProperty("p-ov-feg","fill-color",ovMatch("feg"));
+  m.setPaintProperty("p-ov-lic","fill-color",ovMatch("licence"));m.setPaintProperty("p-ov-ring","fill-color",ovMatch("ring"));m.setPaintProperty("p-ov-lic-line","line-color",ovMatch("licence"));
+  m.setPaintProperty("p-ov-vil","line-color",ovColor("village","in"));m.setPaintProperty("p-ov-vil-f","fill-color",ovColor("village","in"));m.setPaintProperty("p-ov-dmpg","fill-color",ovColor("dmpg","in"));m.setPaintProperty("p-ov-dmpg-line","line-color",ovColor("dmpg","in"));
+  for(const id of ["p-now-h","p-now-m"]){m.setPaintProperty(id,"circle-color",["case",["==",["get","p"],1],on,"rgba(0,0,0,0)"]);m.setPaintProperty(id,"circle-stroke-color",["case",["==",["get","p"],1],sf,on]);m.setPaintProperty(id,"circle-stroke-width",["case",["==",["get","p"],1],.8,1.4])}
 }
-function initProfileMap(){
+function initProfileMap(S){
   if(!window.pmProto&&window.pmtiles){window.pmProto=new pmtiles.Protocol();maplibregl.addProtocol("pmtiles",window.pmProto.tile)}
-  try{pmap=newMap("p-map",{center:[110,-1],zoom:5});window.dashMap=()=>pmap}catch(e){$("#p-map").innerHTML='<p class="hint" style="padding:12px">'+t("The map needs WebGL.")+'</p>';return}
-  pmap.on("load",()=>{
-    const before=firstSymbol(pmap);
-    pmap.addSource("p-now",{type:"geojson",data:EMPTY});
-    pmap.addSource("tiles",{type:"vector",url:"pmtiles://"+TILES_URL,minzoom:6,maxzoom:15});
-    pmap.addSource("sat",{type:"raster",tiles:[SAT_URL],tileSize:256,minzoom:0,maxzoom:17,attribution:SAT_CREDIT});
-    pmap.addLayer({id:"p-sat",type:"raster",source:"sat",layout:{visibility:"none"}},before);
+  let m;try{m=S.m=newMap(S.id,{center:[110,-1],zoom:5});if(S===PS[0])window.dashMap=()=>m}catch(e){$("#"+S.id).innerHTML='<p class="hint" style="padding:12px">'+t("The map needs WebGL.")+'</p>';return}
+  m.on("load",()=>{
+    const before=firstSymbol(m);
+    m.addSource("p-now",{type:"geojson",data:EMPTY});
+    S.tileK=S.pending?S.pending.lay.k:"";
+    m.addSource("tiles",{type:"vector",url:tilesUrl(S.tileK),minzoom:6,maxzoom:15});
+    m.addSource("sat",{type:"raster",tiles:[SAT_URL],tileSize:256,minzoom:0,maxzoom:17,attribution:SAT_CREDIT});
+    m.addLayer({id:"p-sat",type:"raster",source:"sat",layout:{visibility:"none"}},before);
     const none=["==",["get","k"],""];
-    const vt=(id,sl,type,paint,layout)=>pmap.addLayer({id,type,source:"tiles","source-layer":sl,filter:none,...(layout?{layout}:{}),paint},before);
+    const vt=(id,sl,type,paint,layout)=>m.addLayer({id,type,source:"tiles","source-layer":sl,filter:none,...(layout?{layout}:{}),paint},before);
     const hid={visibility:"none"},w=(a,b)=>["interpolate",["linear"],["zoom"],7,a,14,b];
     vt("p-peat","peat","fill",{"fill-color":"#a58660","fill-opacity":.38});
     vt("p-ov-forest","forest","fill",{"fill-color":"#888","fill-opacity":.55},hid);vt("p-ov-feg","feg","fill",{"fill-color":"#888","fill-opacity":.55},hid);
@@ -515,45 +601,54 @@ function initProfileMap(){
     vt("p-canal-s","canal_s","line",{"line-color":"#1baf7a","line-width":w(.6,1.8),"line-opacity":.85},{"line-join":"round"});
     vt("p-canal-p","canal_p","line",{"line-color":"#1baf7a","line-width":w(1,3)},{"line-join":"round"});
     vt("p-outline","outline","line",{"line-color":"#000","line-width":1.6});
-    pmap.addLayer({id:"p-now-m",type:"circle",source:"p-now",filter:["==",["get","h"],0],paint:{"circle-radius":w(2,4.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
-    pmap.addLayer({id:"p-now-h",type:"circle",source:"p-now",filter:["==",["get","h"],1],paint:{"circle-radius":w(3,6.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
+    m.addLayer({id:"p-now-m",type:"circle",source:"p-now",filter:["==",["get","h"],0],paint:{"circle-radius":w(2,4.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
+    m.addLayer({id:"p-now-h",type:"circle",source:"p-now",filter:["==",["get","h"],1],paint:{"circle-radius":w(3,6.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
     for(const id of ["p-now-m","p-now-h"]){
-      pmap.on("mousemove",id,e=>{const f=e.features[0];if(f){pmap.getCanvas().style.cursor="pointer";showTip(`<b>${t("Hotspot, {m}",{m:monf(f.properties.m)})}</b><br><span>${t("{c} confidence · {p}",{c:t(f.properties.h?"high":"medium"),p:t(f.properties.p?"on peat":"off peat")})}</span>`,e.originalEvent)}});
-      pmap.on("mouseleave",id,()=>{pmap.getCanvas().style.cursor="";hideTip()})}
-    const ovHover=(id,f)=>{pmap.on("mousemove",id,e=>{if(pmap.queryRenderedFeatures(e.point,{layers:["p-now-m","p-now-h"]}).length)return;const x=e.features[0];if(x)showTip(f(x.properties),e.originalEvent)});pmap.on("mouseleave",id,hideTip)};
+      m.on("mousemove",id,e=>{const f=e.features[0];if(f){m.getCanvas().style.cursor="pointer";showTip(`<b>${t("Hotspot, {m}",{m:monf(f.properties.m)})}</b><br><span>${t("{c} confidence · {p}",{c:t(f.properties.h?"high":"medium"),p:t(f.properties.p?"on peat":"off peat")})}</span>`,e.originalEvent)}});
+      m.on("mouseleave",id,()=>{m.getCanvas().style.cursor="";hideTip()})}
+    const ovHover=(id,f)=>{m.on("mousemove",id,e=>{if(m.queryRenderedFeatures(e.point,{layers:["p-now-m","p-now-h"]}).length)return;const x=e.features[0];if(x)showTip(f(x.properties),e.originalEvent)});m.on("mouseleave",id,hideTip)};
     const lab=(layer,c)=>t((OVCLS[layer].find(a=>a[0]===c)||[0,""])[1]);
     ovHover("p-ov-forest",p=>`<b>${lab("forest",p.c)}</b>`);ovHover("p-ov-feg",p=>`<b>${lab("feg",p.c)}</b>`);ovHover("p-ov-ring",p=>`<b>${lab("ring",p.c)}</b>`);
     ovHover("p-ov-lic",p=>`<b>${esc(p.n||lab("licence",p.c))}</b><br><span>${lab("licence",p.c)}</span>`);
     ovHover("p-ov-vil-f",p=>`<b>${esc(p.n)}</b><br><span>${t("Target village")}</span>`);
     ovHover("p-ov-dmpg",p=>`<b>${esc(p.n)}</b><br><span>${esc(p.p)} · ${esc(p.s)}</span>`);
-    pReady=true;pTheme();applyLayerToggles();
-    if(pPending!==undefined)setProfileData(pPending);
+    S.ready=true;pTheme(S);applyLayerToggles();
+    if(S.pending!==undefined)setProfileData(S,S.pending);
   });
 }
 function applyLayerToggles(){
-  if(!pmap||!pReady)return;
-  const vis=(ids,on)=>ids.forEach(id=>pmap.setLayoutProperty(id,"visibility",on?"visible":"none"));
-  vis(["p-sat"],pSat);vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-h"],pLayers.now);vis(["p-now-m"],pLayers.now&&!onlyHigh()&&!pNow.high);
-  {const f=nowFilter();pmap.setFilter("p-now-m",f.m);pmap.setFilter("p-now-h",f.h)}
+  for(const S of PS){
+    const m=S.m;if(!m||!S.ready)continue;
+    const vis=(ids,on)=>ids.forEach(id=>m.setLayoutProperty(id,"visibility",on?"visible":"none"));
+    vis(["p-sat"],pSat);vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-h"],pLayers.now);vis(["p-now-m"],pLayers.now&&!onlyHigh()&&!pNow.high);
+    {const f=nowFilter();m.setFilter("p-now-m",f.m);m.setFilter("p-now-h",f.h)}
+    vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-ring"],pOv.mode==="ring");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);vis(["p-ov-dmpg","p-ov-dmpg-line"],pOv.dmpg);
+  }
   setNowLab();
-  vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-ring"],pOv.mode==="ring");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);vis(["p-ov-dmpg","p-ov-dmpg-line"],pOv.dmpg);
 }
-function setProfileData(P){
+function setProfileData(S,P){const pmap=S.m;
   const fc=f=>({type:"FeatureCollection",features:f}),k=P?P.lay.k:"";
+  if(P&&S.tileK!==k){S.tileK=k;pmap.getSource("tiles").setUrl(tilesUrl(k))}       // each map reads the archive of the KHG it shows
   for(const id of TILE_LAYERS)pmap.setFilter(id,["==",["get","k"],k]);
   if(!P){pmap.getSource("p-now").setData(EMPTY);return}
   const L=P.lay;
   pmap.getSource("p-now").setData(fc(L.now.map(p=>({type:"Feature",properties:{m:p[2],h:p[3],p:p[4]},geometry:{type:"Point",coordinates:[p[0],p[1]]}}))));
   const b=L.bounds;pmap.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:28,duration:0,maxZoom:14});
 }
-function drawMap(P){
-  if(!pmap)initProfileMap();
-  pPending=P;if(pmap&&pReady)setProfileData(P);
+function drawMap(P,P2){
+  // the second map opens beside the first when a KHG is compared
+  const mc=$("#p-mapc2");PS[1].hidden=!P2;mc.hidden=!P2;$("#p-maps").classList.toggle("two",!!P2);
+  PS.forEach((S,j)=>{const Pj=j===0?P:P2||null;
+    if(j===1&&!P2)return;
+    S.pending=Pj;
+    if(!S.m)initProfileMap(S);else S.m.resize();
+    if(S.m&&S.ready)setProfileData(S,Pj)});
+  $("#p-cap").textContent=P2&&P?K.name[K.id.indexOf(P.lay.k)]:"";$("#p-cap2").textContent=P2?K.name[K.id.indexOf(P2.lay.k)]:"";
   const tools=$("#p-tools");tools.innerHTML="";
   if(P){const lb0=document.createElement("span");lb0.className="lab";lb0.textContent=t("Layers");tools.appendChild(lb0)}
   if(!P){$("#p-foot").textContent="";$("#p-ov-leg").innerHTML="";return}
   const T=[["peat","Peat extent",`<i class="poly" style="background:var(--peat)"></i>`,"Peat extent used for the rates (GFW composite, 76 m): the area that burned area and hotspots are divided by."],["burn","Burned, times",`<i class="poly" style="background:var(--burn1)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. A stronger shade means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
-  T.forEach(([k,tx,ic,tp])=>{const s=document.createElement("span");s.className="tg"+(pLayers[k]?"":" off");s.innerHTML=ic+t(tx,{n:nowCount(P)});if(k==="now")nowLab={s,ic,tx};s.dataset.tip=t(tp);s.onclick=()=>{pLayers[k]=!pLayers[k];s.classList.toggle("off",!pLayers[k]);applyLayerToggles()};tools.appendChild(s)});
+  T.forEach(([k,tx,ic,tp])=>{const s=document.createElement("span");s.className="tg"+(pLayers[k]?"":" off");s.innerHTML=ic+t(tx,{n:nowCounts()});if(k==="now")nowLab={s,ic,tx};s.dataset.tip=t(tp);s.onclick=()=>{pLayers[k]=!pLayers[k];s.classList.toggle("off",!pLayers[k]);applyLayerToggles()};tools.appendChild(s)});
   {const ms=P.now_m.map(m=>m[0]);
     if(ms.length){
       const lo=Math.min(...ms),hi=Math.max(...ms);pNow.a=Math.max(lo,Math.min(pNow.a,hi));pNow.b=Math.min(hi,Math.max(pNow.b,lo));if(pNow.b<pNow.a)pNow.b=hi;
@@ -663,7 +758,7 @@ function renderOv(P){
       A.map((a,j)=>`<tr class="zr" data-z="licence" data-i="${j}"><td style="text-align:left;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${esc(a[0])}">${esc(a[0])}</td><td style="text-align:left">${esc(t(a[1]))}</td><td>${fmt(a[2],1)}</td><td>${fmt(a[5],1)}</td><td>${fmt(a[3],1)}</td><td style="${bar(a[4])}">${fmt(a[4],0)}</td><td>${a[6]==null?"":fmt(a[6],1)}</td><td style="${bar(a[7]||0)}">${fmt(a[7]||0,0)}</td></tr>`).join("")+`</tbody></table></div><p class="hint">${t("Hotspots inside each licence area and its 5 km ring, year to date. This shows where fires burn, not who started them.")}</p>`}
   html+="</div>";
   const V=P.ov.v||[];
-  if(V.length)html+=`<div class="ovact"><div class="ovt hasTip"${tipAttr(t("DMPG villages that reach into this KHG, by area inside it. Area, peat, burned peat (2015 to 2025) and hotspots this year are counted inside the KHG only."))}>${t("DMPG villages")} <small>${V.length}</small></div><div class="tablewrap" style="max-height:260px"><table><thead><tr><th>${t("Village")}</th><th>${t("Sub-district")}</th><th>${t("Programme")}</th><th>${t("Scheme")}</th><th>${t("Area km2")}</th><th>${t("Peat km2")}</th><th>${t("Burned peat km2")}</th><th>${t("Hotspots")}</th></tr></thead><tbody>`+
+  if(V.length)html+=`<div class="ovact"><div class="ovt hasTip"${tipAttr(t("DMPG villages that reach into this KHG, by area inside it. Area, peat, burned peat (2015 to 2025) and hotspots this year are counted inside the KHG only."))}>${t("DMPG villages")} <small>${V.length}</small></div><div class="tablewrap" style="max-height:260px"><table class="t4"><thead><tr><th>${t("Village")}</th><th>${t("Sub-district")}</th><th>${t("Programme")}</th><th>${t("Scheme")}</th><th>${t("Area km2")}</th><th>${t("Peat km2")}</th><th>${t("Burned peat km2")}</th><th>${t("Hotspots")}</th></tr></thead><tbody>`+
     V.map((v,j)=>`<tr class="zr" data-z="dmpg" data-i="${j}"><td style="text-align:left">${esc(v[0])}</td><td style="text-align:left">${esc(v[1])}</td><td style="text-align:left">${esc(v[2].replace("Skema ",""))}</td><td style="text-align:left">${esc(v[3])}</td><td>${fmt(v[4],1)}</td><td>${fmt(v[5],1)}</td><td>${fmt(v[6],1)}</td><td>${fmt(v[7],0)}</td></tr>`).join("")+`</tbody></table></div></div>`;
   host.innerHTML=html;
   host.onclick=e=>{const r=e.target.closest("tr.zr");if(r)zoomTo(P,r.dataset.z,+r.dataset.i)};
@@ -671,11 +766,11 @@ function renderOv(P){
 }
 // click a licence holder or DMPG village row: switch its layer on and fly to its polygons on the map
 function zoomTo(P,kind,i){
-  if(!pmap||!P||!P.lay.ov)return;
+  const pmap=PS[0].m;if(!pmap||!P||!P.lay.ov)return;
   const key=kind==="dmpg"?(v=>`${v[0]}, ${v[1]}`)(P.ov.v[i]):P.ov.a[i][0],bb=P.lay.ov.ob[kind][key];
   if(!bb)return;
   if(kind==="dmpg")pOv.dmpg=true;else pOv.mode="licence";
-  drawMap(P);applyLayerToggles();
+  drawMap(P,cmpProf());applyLayerToggles();
   pmap.getContainer().scrollIntoView({block:"nearest",behavior:"smooth"});
   pmap.fitBounds([[bb[0],bb[1]],[bb[2],bb[3]]],{padding:40,duration:700,maxZoom:15});
 }
@@ -686,10 +781,10 @@ function ovTable(P){
     const base=layer.startsWith("licence_")?"licence":layer,lb=layer==="licence_any"?t("Any licence"):null;
     arr.forEach(r=>{const l=lb||t((OVCLS[base].find(a=>a[0]===r[0])||[0,r[0]])[1]);
       rows+=`<tr><td style="text-align:left">${t(names[layer]||"Licences")}</td><td style="text-align:left">${esc(l)}</td><td>${fmt(r[1],1)}</td><td>${fmt(r[2],1)}</td><td>${fmt(r[3],1)}</td><td>${fmt(r[4],0)}</td></tr>`})}
-  return `<table style="margin-top:10px"><thead><tr><th style="text-align:left">${t("Layer")}</th><th style="text-align:left">${t("Class")}</th><th>${t("Area km2")}</th><th>${t("Peat km2")}</th><th>${t("Burned peat km2")}</th><th>${t("Hotspots")}</th></tr></thead><tbody>${rows}</tbody></table>`}
+  return `<table class="dt wide"><thead><tr><th style="text-align:left">${t("Layer")}</th><th style="text-align:left">${t("Class")}</th><th>${t("Area km2")}</th><th>${t("Peat km2")}</th><th>${t("Burned peat km2")}</th><th>${t("Hotspots")}</th></tr></thead><tbody>${rows}</tbody></table>`}
 function themeMaps(){
-  for(const m of [nat,pmap])if(m&&m.isStyleLoaded()){restyleBase(m)}
-  pTheme();
+  for(const m of [nat,...PS.map(S=>S.m)])if(m&&m.isStyleLoaded()){restyleBase(m)}
+  PS.forEach(pTheme);
   if(state.sel){const P=profData(state.sel);if(P&&P.ov){renderOv(P);ovLegend(P)}}
 }
 
@@ -723,7 +818,7 @@ function buildNotes(){
     t("KHG under {a} km2, or under the minimum peat area, are not ranked.",{a:META.min_area}),
     t("The default weights are provisional. Canal weights (0.5, 0.3, 0.2) split the single canal weight used before."),
     v?t("Scored on 2015 to 2022 without this year's hotspots, the default weights give AUC {a} against hotspots in 2023 to 2025. Fire history alone gives {b}.",{a:fx(v.auc,3),b:fx(v.auc_hist,3)}):"",
-    t("Profiles cover the top {n} at default weights and the team KHG. Generated {d}.",{n:META.top_n,d:META.generated})
+    META.n_profiles===META.n_khg?t("Every KHG has a profile. Rain, deficit, land cover, land status and tenure are shown for the {n} KHG where they have been computed. Generated {d}.",{n:META.n_full,d:META.generated}):t("Profiles cover the top {n} at default weights and the team KHG. Generated {d}.",{n:META.top_n,d:META.generated})
   ].filter(Boolean);
   $("#notes-list").innerHTML=items.map(tx=>`<li>${esc(tx)}</li>`).join("");
   $("#notes-btn").onclick=()=>$("#notes").showModal();$("#notes-close").onclick=()=>$("#notes").close();
@@ -738,10 +833,10 @@ function applyStatic(){
 function setLang(l){
   LANG=l==="id"?"id":"en";
   applyStatic();buildControls();fillPick();buildNotes();buildZoomButtons();buildTable();staticTips();
-  mapLabels(nat);mapLabels(pmap);
+  mapLabels(nat);PS.forEach(S=>mapLabels(S.m));
   render();history.replaceState(null,"",hashState());
 }
-function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.conf==="h"?"&c=h":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}`}
+function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.conf==="h"?"&c=h":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}${state.cmp?"&k2="+encodeURIComponent(state.cmp):""}`}
 function readHash(){
   const h=new URLSearchParams(location.hash.slice(1));
   if(h.get("l")==="id"||h.get("l")==="en")LANG=h.get("l");else LANG=(navigator.language||"").toLowerCase().startsWith("id")?"id":"en";
@@ -753,6 +848,7 @@ function readHash(){
   if(h.get("i"))h.get("i").split(",").forEach(n=>state.islands.add(n));
   if(h.get("c")==="h")state.conf="h";
   if(h.get("k"))state.sel=h.get("k");
+  if(h.get("k2"))state.cmp=h.get("k2");
 }
 
 // ---------------------------------------------------------------- render loop
@@ -774,11 +870,13 @@ function init(){
   document.body.dataset.parity=cmp+":"+bad;
   if(!state.sel||K.id.indexOf(state.sel)<0){const first=R.order.find(i=>K.has[i]);state.sel=K.id[first!==undefined?first:0]}
   const i0=K.id.indexOf(state.sel);$("#p-pick").value=K.has[i0]?state.sel:"";
+  if(state.cmp&&(K.id.indexOf(state.cmp)<0||state.cmp===state.sel))state.cmp=null;
+  $("#p-cmp").value=state.cmp||"";
   render();
   $("#theme-btn").onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;r.dataset.theme=dark?"light":"dark";themeMaps();render();history.replaceState(null,"",hashState())};
   if(window.ResizeObserver){let ro;new ResizeObserver(()=>{clearTimeout(ro);ro=setTimeout(()=>{nat&&nat.resize()},80)}).observe($("#map"))}
-  if(window.ResizeObserver){let ro2;new ResizeObserver(()=>{clearTimeout(ro2);ro2=setTimeout(()=>{pmap&&pmap.resize()},80)}).observe($("#p-map"))}
-  let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{nat&&nat.resize();pmap&&pmap.resize();render()},150)});
+  if(window.ResizeObserver){let ro2;const o2=new ResizeObserver(()=>{clearTimeout(ro2);ro2=setTimeout(()=>{PS.forEach(S=>S.m&&S.m.resize())},80)});o2.observe($("#p-map"));o2.observe($("#p-map2"))}
+  let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{nat&&nat.resize();PS.forEach(S=>S.m&&S.m.resize());render()},150)});
   document.body.dataset.ready="1";
 }
 init();

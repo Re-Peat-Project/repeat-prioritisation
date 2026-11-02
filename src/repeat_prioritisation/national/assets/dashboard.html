@@ -58,15 +58,18 @@
 
 <section class="card profile" id="profile">
   <div class="card-h"><div><h2 id="p-name">Profile</h2><div class="chips" id="p-chips"></div></div>
-    <label class="pick"><span data-i18n="KHG">KHG</span> <select id="p-pick"></select></label></div>
+    <div class="pickrow"><label class="pick"><span data-i18n="KHG">KHG</span> <select id="p-pick"></select></label>
+    <label class="pick"><span data-i18n="Compare with">Compare with</span> <select id="p-cmp"></select></label></div></div>
   <div class="kpis" id="p-kpis"></div>
-  <div class="p-grid">
-    <div class="p-map"><div class="map-tools" id="p-tools"></div><div id="p-map"></div><div class="legend-row" id="p-ov-leg"></div><div class="foot" id="p-foot"></div></div>
-    <div class="p-right">
-      <div id="p-strips"></div>
-      <div id="p-ov-panel" class="ovp"></div>
-      <div class="charts" id="p-charts"></div>
-    </div>
+  <div class="map-tools" id="p-tools"></div>
+  <div class="p-maps" id="p-maps">
+    <div class="p-mapc"><div class="mcap" id="p-cap"></div><div id="p-map"></div></div>
+    <div class="p-mapc" id="p-mapc2" hidden><div class="mcap" id="p-cap2"></div><div id="p-map2"></div></div>
+  </div>
+  <div class="legend-row" id="p-ov-leg"></div><div class="foot" id="p-foot"></div>
+  <div class="p-mid">
+    <div class="p-left"><div id="p-strips"></div><div class="charts" id="p-charts"></div></div>
+    <div id="p-ov-panel" class="ovp"></div>
   </div>
   <details class="data"><summary data-i18n="Data table">Data table</summary><div id="p-table" class="tablewrap"></div></details>
 </section>

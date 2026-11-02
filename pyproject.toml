@@ -31,6 +31,7 @@ repeat-national-stage3 = "repeat_prioritisation.national.stage3:main"
 repeat-national-overlay = "repeat_prioritisation.national.overlay:main"
 repeat-national-land = "repeat_prioritisation.national.land:main"            # kawasan hutan, peat function and DMPG for all 865 KHG
 repeat-national-tenure = "repeat_prioritisation.national.tenure:main"   # hotspots and burned peat by land tenure (licence, forest area, other land) and DMPG
+repeat-national-monthly = "repeat_prioritisation.national.monthly:main"   # VIIRS hotspots on peat per KHG, year and month (the heat map in the profile)
 repeat-national-tenure-dome = "repeat_prioritisation.national.tenure_dome:main"   # the same by position on the peat dome (KHG with a licence-edge run)
 repeat-national-tenure-water = "repeat_prioritisation.national.tenure_water:main"   # model dry-season depth by land tenure (KHG with a model run)
 repeat-national-dashboard = "repeat_prioritisation.national.dashboard:main"
