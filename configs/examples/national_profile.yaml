@@ -30,3 +30,12 @@ indicators:
   u_hotspot_now: {weight: 1.0}   # this year's hotspots (KLH, Jan-Sep 2026), per km2 of peat; its own weight (0 drops it); standalone rank: peringkat_now
   u_burned_now: {weight: 0.0}    # this year's burned share of the peat: reported, not scored
   i_peat_depth: {weight: 0.0}   # peat map covers 89 of 865 KHG: reported, not scored
+fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
+  crs: EPSG:6933          # equal-area grid, so every cell has the same area
+  cell_m: 30
+  tile_cells: 3000        # 90 km tiles, cached and resumable
+  years: [2015, 2026]     # burnt-area flags BA_yyyy (KLHK)
+  villages: batas_desa_indonesia_2023_KLH.gpkg     # land mask, province and district
+  modis: hotspots_modis_2026.gpkg                  # this year's headline series (KLH, then FIRMS MODIS NRT)
+  viirs: [hotspot_viirs_snpp_2012_2025.gpkg, hotspot_viirs_snpp_sp_2026.gpkg, hotspot_viirs_snpp_nrt_2026.gpkg]
+  static_radius_m: {modis: 1000, viirs: 375}       # untyped hotspots this close to a VIIRS volcano/static/offshore detection are flagged static
