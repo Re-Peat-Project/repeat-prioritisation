@@ -39,7 +39,7 @@ def payload(src):
         "meta": {k: meta[k] for k in ("cell_m", "years", "viirs_last", "modis_last", "static_radius_m")},
         "cls": cls,
         "area": {"k": a["k"].tolist(), "ha": a["area_ha"].round(1).tolist(), "ever": a["burned_any_ha"].round(1).tolist(),
-                 "twice": a["burned_2plus_ha"].round(1).tolist(), "burned": [a[f"burned_{y}_ha"].round(1).tolist() for y in years]},
+                 "twice": a["burned_2plus_ha"].round(1).tolist(), "x2": a["burned_2x_ha"].round(1).tolist(), "x3": a["burned_3x_ha"].round(1).tolist(), "x4": a["burned_4plus_ha"].round(1).tolist(), "burned": [a[f"burned_{y}_ha"].round(1).tolist() for y in years]},
         "hot": {"k": h["k"].tolist(), "s": (h["source"] == "viirs").astype(int).tolist(), "y": h["year"].astype(int).tolist(),
                 "m": h["month"].fillna(0).astype(int).tolist(), "hi": (h["conf"] == "high").astype(int).tolist(),
                 "st": h["static"].astype(int).tolist(), "ytd": h["ytd"].astype(int).tolist(), "n": h["n"].astype(int).tolist()},

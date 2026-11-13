@@ -68,6 +68,8 @@ def burned_measures(cells, years):
     nb = sum(((cells["burn"].to_numpy() >> n) & 1) for n in range(len(years)))
     cells["burned_any_ha"] = np.where(nb >= 1, cells["area_ha"], 0.0)
     cells["burned_2plus_ha"] = np.where(nb >= 2, cells["area_ha"], 0.0)
+    for k, lo, hi in (("2x", 2, 2), ("3x", 3, 3), ("4plus", 4, 99)):   # times burned, for the dashboard
+        cells[f"burned_{k}_ha"] = np.where((nb >= lo) & (nb <= hi), cells["area_ha"], 0.0)
     return cells
 
 
@@ -220,7 +222,7 @@ def main(argv=None):
 
     dims_all = ["island", "province", "in_khg", "forest_group", "kawasan", "concession", "lic_bits", "dmpg", "peat"]
     num = ["area_ha"] + [f"burned_{y}_ha" for y in years] + ["burned_any_ha", "burned_2plus_ha"]
-    area = cells.groupby(dims_all, as_index=False)[num].sum()
+    area = cells.groupby(dims_all, as_index=False)[num + ["burned_2x_ha", "burned_3x_ha", "burned_4plus_ha"]].sum()
     area.to_parquet(d / "area.parquet", index=False)
     hdims = dims_all + ["source", "year", "month", "conf", "static", "ytd"]
     hot.groupby(hdims, as_index=False)["n"].sum().to_parquet(d / "hot.parquet", index=False)

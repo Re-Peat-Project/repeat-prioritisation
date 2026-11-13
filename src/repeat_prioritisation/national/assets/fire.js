@@ -29,18 +29,18 @@ const SPLITS={
     classes:[["cons","Conservation","--s6"],["hl","Protection forest","--s3"],["prod","Production forest (HP, HPT)","--s7"],["hpk","Convertible production (HPK)","--s5"],["apl","Other land use (APL)","--s4"],["other","Water, undefined","--s1"],["none","Not mapped","--muted"]],of:k=>C.kawasan[k]},
   dmpg:{label:"DMPG village",help:"Land inside a Desa Mandiri Peduli Gambut village (SiTMAT portal, 838 villages), or outside every one.",
     classes:[["yes","DMPG village","--s5"],["no","Outside DMPG villages","--s1"]],of:k=>C.dmpg[k]?"yes":"no"}};
-const state={basis:"all",scope:"all",island:"",province:"",src:"viirs",year:NOW,high:false,stat:false,split:"concession",sk:"hs",sd:-1,q:""};
+const state={dy:2026,basis:"all",scope:"all",island:"",province:"",src:"viirs",year:NOW,high:false,stat:false,split:"concession",sk:"hs",sd:-1,q:""};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 // ---------------------------------------------------------------- aggregation
 const keepK=new Uint8Array(NK);
 function filterKeys(){for(let k=0;k<NK;k++)keepK[k]=(state.basis==="all"||C.peat[k]===1)&&(state.scope==="all"||(state.scope==="in")===!!C.in_khg[k])&&(!state.island||C.island[k]===state.island)&&(!state.province||C.province[k]===state.province)?1:0}
 const nb=YEARS.length,nv=NOW-V0+1;
-const blank=()=>({area:0,ever:0,twice:0,burned:new Float64Array(nb),sel:0,selM:new Float64Array(13),viirs:new Float64Array(nv),vytd:new Float64Array(nv)});
+const blank=()=>({area:0,ever:0,twice:0,x2:0,x3:0,x4:0,burned:new Float64Array(nb),sel:0,selM:new Float64Array(13),viirs:new Float64Array(nv),vytd:new Float64Array(nv)});
 const yr=()=>state.src==="modis"?NOW:state.year;
 function aggregate(key,extra){
   const out=new Map(),get=g=>{let a=out.get(g);if(!a){a=blank();out.set(g,a)}return a};
-  for(let i=0;i<AR.k.length;i++){const k=AR.k[i];if(!keepK[k]||(extra&&!extra(k)))continue;const a=get(key(k));a.area+=AR.ha[i];a.ever+=AR.ever[i];a.twice+=AR.twice[i];for(let b=0;b<nb;b++)a.burned[b]+=AR.burned[b][i]}
+  for(let i=0;i<AR.k.length;i++){const k=AR.k[i];if(!keepK[k]||(extra&&!extra(k)))continue;const a=get(key(k));a.area+=AR.ha[i];a.ever+=AR.ever[i];a.twice+=AR.twice[i];a.x2+=AR.x2[i];a.x3+=AR.x3[i];a.x4+=AR.x4[i];for(let b=0;b<nb;b++)a.burned[b]+=AR.burned[b][i]}
   const srcV=state.src==="viirs"?1:0,Y=yr();
   for(let j=0;j<HT.k.length;j++){const k=HT.k[j];if(!keepK[k]||(extra&&!extra(k))||(state.high&&!HT.hi[j])||(!state.stat&&HT.st[j]))continue;
     const a=get(key(k)),n=HT.n[j],y=HT.y[j];
@@ -94,19 +94,6 @@ function kpis(T,conc,forest,dmpg){
     k(t("In forest area"),pct(forest.get("kawasan")?.sel||0,T.sel),share(forest,"kawasan"),t("Share inside the forest area (kawasan hutan), with or without a licence."))+
     k(t("In DMPG villages"),pct(dmpg.get("yes")?.sel||0,T.sel),share(dmpg,"yes"),t("Share inside DMPG village land."))}
 
-function matrix(){
-  const M=aggregate(k=>SPLITS.concession.of(k)+"|"+C.forest_group[k]),R=SPLITS.concession.classes,Cc=SPLITS.forest.classes,Y=yr(),src=state.src.toUpperCase();
-  const scope=state.province||(state.island?state.island.replace(/^Pulau /,""):t("Indonesia"));
-  $("#mx-title").textContent=`${t("Concession and forest area")} · ${scope}`;
-  $("#mx-hint").innerHTML=`${t("Each cell")}: <b>${t("hotspots per 100 km²")}</b> · ${t("area")} km² · ${t("burned")} ${Y} ha · ${t("hotspots")} ${Y} (${src}). ${t("Shade: hotspot density.")}`;
-  let mx=1e-9;R.forEach(r=>Cc.forEach(c=>{const a=M.get(r[0]+"|"+c[0]);if(a)mx=Math.max(mx,rate(a.sel,a.area)||0)}));
-  let h=`<span></span>`+Cc.map(c=>`<span class="h"${tip(t(SPLITS.forest.help))}>${t(c[1])}</span>`).join("");
-  R.forEach(r=>{h+=`<span${tip(t(SPLITS.concession.help))}><i class="sw" style="background:var(${r[2]})"></i>${t(r[1])}</span>`;
-    Cc.forEach(c=>{const a=M.get(r[0]+"|"+c[0])||blank(),d=rate(a.sel,a.area),w=d?Math.round(60*d/mx):0;
-      h+=`<div class="cell" style="background:color-mix(in srgb,var(--s2) ${w}%,transparent)"${tip(`<b>${t(r[1])} · ${t(c[1])}</b><br>${f1(d)} ${t("per 100 km²")}<br>${f0(a.area/100)} km² · ${f0(a.sel)} ${t("hotspots")}<br>${t("Burned")} ${Y}: ${f0(bY(a))} ha${incomplete()?"*":""} · ${t("mean")} ${PAST[0]}–${PAST[1]}: ${f0(meanPast(a))} ha/${t("yr")}`)}>
-        <div class="d">${f1(d)}</div><div>${f0(a.area/100)} km²</div><div>${f0(bY(a))} ha${incomplete()?"*":""}</div><div>${f0(a.sel)} ${t("hotspots")}</div></div>`})});
-  $("#mx").innerHTML=h}
-
 function classTable(cls,shown){
   const sp=SPLITS[state.split],Y=yr(),scope=state.province||(state.island?state.island.replace(/^Pulau /,""):t("Indonesia"));
   $("#cls-title").textContent=`${t("By")} ${t(sp.label).toLowerCase()} · ${scope}`;
@@ -157,16 +144,148 @@ function lineChart(host,title,series,xs,xfmt,yunit){
       const tipEl=$("#tip");tipEl.innerHTML=`<b>${xfmt(xs[i])}</b>`+series.map(s=>`<br><i class="sw" style="background:${css(s.color)}"></i>${esc(s.name)}: ${f0(s.v[i])}`).join("");showTip(ev)})
     .on("mouseleave",()=>{cross.style("display","none");dots.forEach(d=>d.style("display","none"));hideTip()})}
 
-function charts(cls,shown,T){
-  const sp=SPLITS[state.split],Y=yr(),src=state.src.toUpperCase(),last=META.viirs_last;
-  lineChart($("#c-burn"),`${t("Burned area per year")} · ${t(sp.label)}`,shown.map(c=>({name:t(c[1]),color:c[2],v:YEARS.map(y=>cls.get(c[0]).burned[y-Y0]/100)})),YEARS,String,"km²");
-  lineChart($("#c-years"),`${t("VIIRS hotspots per year")}, 1/1–${last.slice(8,10)}/${last.slice(5,7)}`,shown.map(c=>({name:t(c[1]),color:c[2],v:VY.map(y=>cls.get(c[0]).vytd[y-V0])})),VY,String,"");
+function charts(T){
+  const Y=yr(),src=state.src.toUpperCase();
   const lastM=+(state.src==="viirs"?META.viirs_last:META.modis_last).slice(5,7),ms=d3.range(1,lastM+1);
   const S=[{name:`${src} ${Y}`,color:"--s2",v:ms.map(i=>T.selM[i])}];
-  if(state.src==="viirs"){const mm=new Float64Array(13);
-    for(let j=0;j<HT.k.length;j++){const k=HT.k[j];if(!keepK[k]||HT.s[j]!==1||!HT.ytd[j]||HT.y[j]<PAST[0]||HT.y[j]>PAST[1]||(state.high&&!HT.hi[j])||(!state.stat&&HT.st[j]))continue;mm[HT.m[j]]+=HT.n[j]/(PAST[1]-PAST[0]+1)}
+  if(state.src==="viirs"){const mm=new Float64Array(13),m15=new Float64Array(13);
+    for(let j=0;j<HT.k.length;j++){const k=HT.k[j];if(!keepK[k]||HT.s[j]!==1||!HT.ytd[j]||(state.high&&!HT.hi[j])||(!state.stat&&HT.st[j]))continue;
+      if(HT.y[j]>=PAST[0]&&HT.y[j]<=PAST[1])mm[HT.m[j]]+=HT.n[j]/(PAST[1]-PAST[0]+1);if(HT.y[j]===2015)m15[HT.m[j]]+=HT.n[j]}
+    if(Y!==2015)S.push({name:"2015",color:"--s7",v:ms.map(i=>m15[i])});
     S.push({name:`${t("mean")} ${PAST[0]}–${PAST[1]}`,color:"--muted",dash:"4 3",v:ms.map(i=>mm[i])})}
-  lineChart($("#c-month"),`${src} ${t("hotspots per month")}, ${Y}`,S,ms,mon,"")}
+  lineChart($("#c-month"),`${src} ${t("hotspots per month")}`,S,ms,mon,"")}
+
+// ---------------------------------------------------------------- D3 views
+const SEQ=["#f4a172","#ee7a45","#d9592a","#a8410f","#6e2a08"];          // validated ordinal orange ramp
+const TIMES=["--q1","--q2","--q3","--q4"];
+const scopeName=()=>state.province||(state.island?state.island.replace(/^Pulau /,""):t("Indonesia"));
+function frame(host,title,hint,W,H){
+  host.innerHTML=`<h2>${title}</h2>${hint?`<div class="hint">${hint}</div>`:""}`;
+  return d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("role","img").attr("aria-label",title)}
+const T_=(g,x,y,s,o={})=>g.append("text").attr("x",x).attr("y",y).attr("font-size",o.size||12).attr("fill",o.fill||css("--ink")).attr("text-anchor",o.anchor||"start")
+  .attr("dominant-baseline","middle").attr("font-weight",o.weight||400).text(s);
+const tipOn=(sel,html)=>sel.on("mousemove",ev=>showTip(ev,html)).on("mouseleave",hideTip);
+const ink=c=>["#f4a172","#ee7a45"].includes(c)?"#0b0b0b":"#fff";
+
+// donuts: land, burned area and hotspots inside concessions, any year (slider)
+let playing=null;
+function donut(){
+  const host=$("#v-donut"),cc=aggregate(SPLITS.concession.of),Y=state.dy,yi=Y-V0;
+  const g=(k,f)=>{const a=cc.get(k);return a?f(a):0};
+  const parts=[[t("Land"),g("yes",a=>a.area),g("no",a=>a.area),""],
+    [`${t("Burned")} ${Y}`,Y>=Y0?g("yes",a=>a.burned[Y-Y0]):null,Y>=Y0?g("no",a=>a.burned[Y-Y0]):null,(Y===2024||Y===NOW)?"*":""],
+    [`${t("Hotspots")} ${Y}`,g("yes",a=>a.vytd[yi]),g("no",a=>a.vytd[yi]),""]];
+  const W=Math.max(360,host.clientWidth-28),H=340,svg=frame(host,`${t("Inside or outside concessions")} · ${esc(scopeName())}`,
+    t("Share of the land, of the burned area of the year (KLHK) and of the VIIRS hotspots of the year (1 January to the last 2026 date) inside a 2025 business licence. Drag the year."),W,H);
+  const r=Math.min(64,W/8),cw=W/3,cy=86,arc=d3.arc().innerRadius(r*0.62).outerRadius(r);
+  parts.forEach(([lab,a,b,star],i)=>{
+    const cx=cw*i+cw/2,gg=svg.append("g").attr("transform",`translate(${cx},${cy})`),tot=(a||0)+(b||0),p=tot>0?a/tot:null;
+    gg.append("path").attr("d",arc({startAngle:0,endAngle:2*Math.PI})).attr("fill",css("--grid"));
+    if(p!=null)tipOn(gg.append("path").attr("d",arc({startAngle:0,endAngle:2*Math.PI*p})).attr("fill",css("--s2")),`<b>${lab}</b><br>${t("Inside concessions")}: ${Math.round(100*p)}%`);
+    T_(gg,0,0,p==null?"–":`${Math.round(100*p)}%${star}`,{anchor:"middle",size:20,weight:600});
+    T_(svg,cx,cy+r+16,lab,{anchor:"middle",size:12.5,weight:600});
+    T_(svg,cx,cy+r+32,p==null?t("no burned-area map"):(i===2?`${f0(a)} ${t("of")} ${f0(tot)}`:`${f0(a/100)} ${t("of")} ${f0(tot/100)} km²`),{anchor:"middle",size:11,fill:css("--ink2")})});
+  // share inside concessions through the years: hotspots and burned area against the land share
+  const x=d3.scaleLinear([V0,NOW],[44,W-60]),y=d3.scaleLinear([0,60],[H-14,250]);
+  const land=parts[0][2]+parts[0][1]>0?100*parts[0][1]/(parts[0][1]+parts[0][2]):0;
+  svg.append("line").attr("x1",x(V0)).attr("x2",x(NOW)).attr("y1",y(land)).attr("y2",y(land)).attr("stroke",css("--muted")).attr("stroke-dasharray","4 3");
+  T_(svg,x(NOW)+6,y(land),`${t("land")} ${Math.round(land)}%`,{size:10.5,fill:css("--ink2")});
+  const hs=VY.map(v=>{const a=g("yes",z=>z.vytd[v-V0]),b=g("no",z=>z.vytd[v-V0]);return [v,a+b>0?100*a/(a+b):null]});
+  const bs=YEARS.map(v=>{const a=g("yes",z=>z.burned[v-Y0]),b=g("no",z=>z.burned[v-Y0]);return [v,a+b>0?100*a/(a+b):null]});
+  const ln=d3.line().defined(d=>d[1]!=null).x(d=>x(d[0])).y(d=>y(d[1]));
+  svg.append("path").attr("d",ln(bs)).attr("fill","none").attr("stroke",css("--s1")).attr("stroke-width",2);
+  svg.append("path").attr("d",ln(hs)).attr("fill","none").attr("stroke",css("--s2")).attr("stroke-width",2);
+  [[0,"0%"],[20,"20%"],[40,"40%"],[60,"60%"]].forEach(([v,l])=>T_(svg,40,y(v),l,{anchor:"end",size:10,fill:css("--muted")}));
+  svg.append("line").attr("x1",x(Y)).attr("x2",x(Y)).attr("y1",y(60)).attr("y2",y(0)).attr("stroke",css("--ink2"));
+  const hY=hs.find(d=>d[0]===Y);if(hY&&hY[1]!=null)svg.append("circle").attr("cx",x(Y)).attr("cy",y(hY[1])).attr("r",4.5).attr("fill",css("--s2")).attr("stroke",css("--surface")).attr("stroke-width",2);
+  T_(svg,44,226,`${t("Share inside concessions per year")}:`,{size:11,fill:css("--ink2")});
+  const lg=[[t("hotspots"),"--s2"],[t("burned area"),"--s1"]];let lx=44+212;
+  lg.forEach(([l,c])=>{svg.append("rect").attr("x",lx).attr("y",221).attr("width",10).attr("height",10).attr("rx",2).attr("fill",css(c));lx+=14;const tt=T_(svg,lx,226,l,{size:11,fill:css("--ink2")});lx+=tt.node().getComputedTextLength()+12});
+  host.insertAdjacentHTML("beforeend",`<div class="slider"><button type="button" id="dplay">${playing?"❚❚":"▶"}</button><input type="range" id="dyear" min="${V0}" max="${NOW}" value="${Y}" aria-label="${t("Year")}"><b>${Y}</b></div>`);
+  $("#dyear").oninput=e=>{state.dy=+e.target.value;donut();hash()};
+  $("#dplay").onclick=()=>{if(playing){clearInterval(playing);playing=null;donut();return}
+    if(state.dy>=NOW)state.dy=V0;playing=setInterval(()=>{state.dy++;if(state.dy>=NOW){state.dy=NOW;clearInterval(playing);playing=null}donut()},700);donut()}}
+
+// each class's share of land against its share of fire, and hotspot density inside against the rest
+function fireLand(T){
+  const host=$("#v-land"),Y=yr();
+  const defs=[["Concessions",SPLITS.concession.of,"yes"],["Forest area",k=>C.forest_group[k],"kawasan"],["DMPG villages",SPLITS.dmpg.of,"yes"],["Peat",k=>C.peat[k]===1?"yes":"no","yes"]]
+    .filter(d=>!(state.basis==="peat"&&d[0]==="Peat"));
+  const rows=defs.map(([n,f,k])=>{const m=aggregate(f),a=m.get(k)||blank(),o=blank();for(const [kk,v] of m)if(kk!==k){o.area+=v.area;o.sel+=v.sel}
+    return {n,land:T.area?100*a.area/T.area:0,burn:sumPast(T)?100*sumPast(a)/sumPast(T):0,hs:T.sel?100*a.sel/T.sel:0,din:rate(a.sel,a.area),dout:rate(o.sel,o.area),area:a.area}})
+    .filter(r=>r.area>0).sort((a,b)=>(b.din/b.dout||0)-(a.din/a.dout||0));
+  const W=Math.max(420,host.clientWidth-28),rh=52,top=58,H=top+rows.length*rh+20;
+  const svg=frame(host,`${t("Fire against land")} · ${esc(scopeName())}`,t("Left: share of the area, of the burned area 2015 to 2025 and of the hotspots of the year. Right: hotspots per 100 km² inside the class and on the rest of the land."),W,H);
+  const L=112,xa=d3.scaleLinear([0,Math.max(70,d3.max(rows,r=>Math.max(r.land,r.burn,r.hs))+8)],[L,L+(W-L)*0.5]);
+  const xb=d3.scaleLinear([0,d3.max(rows,r=>Math.max(r.din||0,r.dout||0))*1.15||1],[xa.range()[1]+40,W-150]);
+  [[css("--muted"),"open",t("area")],[css("--s1"),"fill",t("burned area")],[css("--s2"),"fill",`${t("hotspots")} ${Y}`]].forEach(([c,k,l],i)=>{
+    const x0=L+i*110;svg.append("circle").attr("cx",x0+5).attr("cy",14).attr("r",5).attr("fill",k==="open"?css("--surface"):c).attr("stroke",c).attr("stroke-width",2);T_(svg,x0+14,14,l,{size:11,fill:css("--ink2")})});
+  [[css("--s2"),t("inside")],[css("--axis"),t("rest of the land")]].forEach(([c,l],i)=>{const x0=xb(0)+i*70;svg.append("rect").attr("x",x0).attr("y",9).attr("width",10).attr("height",10).attr("rx",2).attr("fill",c);T_(svg,x0+14,14,l,{size:11,fill:css("--ink2")})});
+  T_(svg,L,36,"%",{size:10.5,fill:css("--muted")});T_(svg,xb(0),36,t("per 100 km²"),{size:10.5,fill:css("--muted")});
+  rows.forEach((r,i)=>{
+    const y=top+i*rh+12;
+    T_(svg,L-12,y-6,t(r.n),{anchor:"end",size:12.5,weight:600});T_(svg,L-12,y+9,`${f0(r.area/100)} km²`,{anchor:"end",size:10.5,fill:css("--muted")});
+    const lo=Math.min(r.land,r.burn,r.hs),hi=Math.max(r.land,r.burn,r.hs);
+    svg.append("line").attr("x1",xa(lo)).attr("x2",xa(hi)).attr("y1",y).attr("y2",y).attr("stroke",css("--axis")).attr("stroke-width",2);
+    [[r.land,"open",css("--muted")],[r.burn,"fill",css("--s1")],[r.hs,"fill",css("--s2")]].forEach(([v,k,c])=>
+      tipOn(svg.append("circle").attr("cx",xa(v)).attr("cy",y).attr("r",6.5).attr("fill",k==="open"?css("--surface"):c).attr("stroke",k==="open"?c:css("--surface")).attr("stroke-width",2),
+        `<b>${t(r.n)}</b><br>${t("area")} ${f1(r.land)}% · ${t("burned area")} ${f1(r.burn)}% · ${t("hotspots")} ${f1(r.hs)}%`));
+    T_(svg,xa(r.land),y+17,`${Math.round(r.land)}%`,{anchor:"middle",size:10.5,fill:css("--muted")});
+    T_(svg,xa(hi)+11,y,`${Math.round(r.burn)}% · ${Math.round(r.hs)}%`,{size:11,fill:css("--ink2")});
+    [[r.din,css("--s2"),-9],[r.dout,css("--axis"),1]].forEach(([v,c,dy])=>{svg.append("rect").attr("x",xb(0)).attr("y",y+dy).attr("width",Math.max(0,xb(v||0)-xb(0))).attr("height",8).attr("rx",2).attr("fill",c);
+      T_(svg,xb(v||0)+4,y+dy+4,f0(v),{size:10.5,fill:css("--ink2")})});
+    const q=r.din&&r.dout?r.din/r.dout:null;T_(svg,W-4,y,q?`${f1(q)}× ${t("the rest")}`:"–",{anchor:"end",size:12,weight:600,fill:q>=2?css("--ink"):css("--ink2")})})}
+
+// forest area x concession as a Marimekko: width = land of the forest group, height = share in concessions, colour = density
+function mosaic(){
+  const host=$("#v-mosaic"),Y=yr(),m=aggregate(k=>C.forest_group[k]+"|"+((C.lic_bits[k]&CONC)?"c":"n"));
+  const G=[["kawasan",t("Forest area (kawasan hutan)")],["apl",t("Other land use (APL)")]].map(([g,l])=>{const c=m.get(g+"|c")||blank(),n=m.get(g+"|n")||blank();return {g,l,c,n,area:c.area+n.area}}).filter(d=>d.area>0);
+  const W=Math.max(380,host.clientWidth-28),H=300,svg=frame(host,`${t("Concession and forest area")} · ${esc(scopeName())}`,
+    t("Column width: area of the forest group. Height: share inside and outside concessions. Colour: hotspots per 100 km² in the selected year."),W,H);
+  const br=[10,20,40,80],col=d=>d==null?css("--grid"):SEQ[d3.bisectRight(br,d)];
+  const x0=8,x1=W-8,y0=10,y1=H-50,tot=d3.sum(G,d=>d.area);let x=x0;
+  G.forEach(d=>{const w=(x1-x0)*d.area/tot;let y=y0;
+    [[d.c,t("Concession")],[d.n,t("No concession")]].forEach(([a,lab])=>{const h=(y1-y0)*a.area/d.area,den=rate(a.sel,a.area),c=col(den);
+      if(h>0){tipOn(svg.append("rect").attr("x",x+1).attr("y",y+1).attr("width",Math.max(0,w-2)).attr("height",Math.max(0,h-2)).attr("rx",3).attr("fill",c),
+        `<b>${lab} · ${d.l}</b><br>${f1(den)} ${t("per 100 km²")}<br>${f0(a.area/100)} km² · ${f0(a.sel)} ${t("hotspots")} ${Y}`);
+        if(h>34&&w>90){T_(svg,x+8,y+14,lab,{size:12,weight:600,fill:ink(c)});T_(svg,x+8,y+30,`${f1(den)} ${t("per 100 km²")} · ${Math.round(100*a.area/d.area)}%`,{size:11,fill:ink(c)})}}
+      y+=h});
+    T_(svg,x+w/2,y1+14,d.l,{anchor:"middle",size:11.5,fill:css("--ink2")});T_(svg,x+w/2,y1+28,`${Math.round(100*d.area/tot)}% ${t("of the area")}`,{anchor:"middle",size:10.5,fill:css("--muted")});x+=w});
+  let lx=8;const ly=H-8;T_(svg,lx,ly,`${t("per 100 km²")}:`,{size:10.5,fill:css("--ink2")});lx+=72;
+  ["< 10","10–20","20–40","40–80","≥ 80"].forEach((l,i)=>{svg.append("rect").attr("x",lx).attr("y",ly-5).attr("width",10).attr("height",10).attr("rx",2).attr("fill",SEQ[i]);lx+=14;const tt=T_(svg,lx,ly,l,{size:10.5,fill:css("--ink2")});lx+=tt.node().getComputedTextLength()+10})}
+
+// provinces x years: VIIRS hotspots per 100 km², 1 January to the last 2026 date
+function heat(){
+  const host=$("#v-heat"),P=aggregate(k=>C.province[k]),T=aggregate(()=>"all").get("all")||blank(),Ysel=state.src==="viirs"?state.year:NOW;
+  const rows=[...P].filter(([p,a])=>!p.startsWith("Outside")&&a.area>0).map(([p,a])=>({p,a})).sort((u,v)=>(v.a.vytd[Ysel-V0]/v.a.area)-(u.a.vytd[Ysel-V0]/u.a.area));
+  rows.unshift({p:scopeName(),a:T,all:true});
+  const rh=15,L=150,top=40,W=Math.max(480,host.clientWidth-28),H=top+rows.length*rh+30,cw=(W-L-60)/VY.length;
+  const svg=frame(host,`${t("Hotspots by province and year")}`,t("VIIRS hotspots per 100 km² of land, 1 January to the last 2026 date in every year. Rows sorted by the selected year; click a province to select it."),W,H);
+  const br=[1,3,10,30,100],ramp=[css("--grid"),...SEQ],col=v=>ramp[d3.bisectRight(br,v)];
+  VY.forEach((y,j)=>T_(svg,L+j*cw+cw/2,top-10,String(y).slice(2),{anchor:"middle",size:10.5,fill:y===Ysel?css("--ink"):css("--muted"),weight:y===Ysel?600:400}));
+  rows.forEach((r,i)=>{const y=top+i*rh,sel=r.p===state.province;
+    const lab=T_(svg,L-8,y+rh/2,r.p.length>24?r.p.slice(0,23)+"…":r.p,{anchor:"end",size:11,weight:r.all||sel?600:400,fill:sel?css("--s2"):css("--ink2")});
+    if(!r.all)lab.style("cursor","pointer").on("click",()=>{state.province=state.province===r.p?"":r.p;state.island=state.province?(C.island[C.province.indexOf(r.p)]||state.island):state.island;update()});
+    VY.forEach((yy,j)=>{const v=r.a.vytd[yy-V0]/r.a.area*1e4;
+      tipOn(svg.append("rect").attr("x",L+j*cw+0.5).attr("y",y+0.5).attr("width",cw-1).attr("height",rh-1).attr("rx",2).attr("fill",col(v)),`<b>${esc(r.p)} · ${yy}</b><br>${f1(v)} ${t("per 100 km²")} · ${f0(r.a.vytd[yy-V0])} ${t("hotspots")}`)});
+    if(r.all)svg.append("line").attr("x1",L).attr("x2",L+VY.length*cw).attr("y1",y+rh+1.5).attr("y2",y+rh+1.5).attr("stroke",css("--axis"))});
+  const j=VY.indexOf(Ysel);if(j>=0)svg.append("rect").attr("x",L+j*cw).attr("y",top).attr("width",cw).attr("height",rows.length*rh).attr("fill","none").attr("stroke",css("--ink")).attr("stroke-width",1.5).attr("rx",2);
+  let lx=L;const ly=H-12;["< 1","1–3","3–10","10–30","30–100","≥ 100"].forEach((l,i)=>{svg.append("rect").attr("x",lx).attr("y",ly-5).attr("width",10).attr("height",10).attr("rx",2).attr("fill",ramp[i]);lx+=14;const tt=T_(svg,lx,ly,l,{size:10.5,fill:css("--ink2")});lx+=tt.node().getComputedTextLength()+10})}
+
+// times burned, per class of the chosen split: share of the class burned once, twice, three times, four or more
+function timesBurned(){
+  const host=$("#v-times");
+  const pairs=[[SPLITS.concession.of,[["yes","Concession"],["no","No concession"]]],[k=>C.forest_group[k],[["kawasan","Forest area (kawasan hutan)"],["apl","Other land use (APL)"]]],
+    [SPLITS.dmpg.of,[["yes","DMPG village"],["no","Outside DMPG villages"]]],[k=>C.peat[k]===1?"yes":"no",[["yes","Peat"],["no","Not peat"]]]].filter(p=>!(state.basis==="peat"&&p[1][0][1]==="Peat"));
+  const rows=[];pairs.forEach(([f,cl],g)=>{const m=aggregate(f);cl.forEach(([k,l])=>{const a=m.get(k);if(a&&a.area>0)rows.push({l,a,g})})});
+  const W=Math.max(320,host.clientWidth-28),rh=24,top=34,H=top+rows.length*rh+pairs.length*6+10;
+  const svg=frame(host,`${t("Times burned")} · ${esc(scopeName())}`,t("Share of each class burned once, twice, three times or four or more times in the burn years 2015 to 2026 (KLHK). The 2024 and 2026 maps are incomplete, so these are lower bounds."),W,H);
+  const L=170,mx=d3.max(rows,r=>r.a.area?100*r.a.ever/r.a.area:0)||1,x=d3.scaleLinear([0,mx*1.15],[L,W-50]),lab=[t("once"),t("twice"),t("3 times"),t("4 or more")];
+  lab.forEach((l,i)=>{svg.append("rect").attr("x",L+i*72).attr("y",9).attr("width",10).attr("height",10).attr("rx",2).attr("fill",css(TIMES[i]));T_(svg,L+i*72+14,14,l,{size:10.5,fill:css("--ink2")})});
+  rows.forEach((r,i)=>{const a=r.a,y=top+i*rh+r.g*6,v=[a.ever-a.twice,a.x2,a.x3,a.x4].map(z=>100*z/a.area);let x0=x(0);
+    T_(svg,L-8,y+8,t(r.l).length>26?t(r.l).slice(0,25)+"…":t(r.l),{anchor:"end",size:11,fill:css("--ink2")});
+    v.forEach((p,k)=>{const w=x(p)-x(0);if(w>0)tipOn(svg.append("rect").attr("x",x0).attr("y",y+1).attr("width",Math.max(0,w-1)).attr("height",14).attr("fill",css(TIMES[k])),`<b>${t(r.l)}</b><br>${lab[k]}: ${f1(p)}% ${t("of the area")}`);x0+=w});
+    T_(svg,x0+5,y+8,`${f1(d3.sum(v))}%`,{size:10.5,fill:css("--ink2")})})}
 
 // ---------------------------------------------------------------- province table
 function provinces(){
@@ -196,13 +315,13 @@ function hideTip(){tipEl.style.display="none"}
   document.addEventListener("mousemove",e=>{const el=find(e);if(el)showTip(e,el.dataset.tip)});
   document.addEventListener("mouseout",e=>{const el=find(e);if(el&&!(e.relatedTarget&&el.contains(e.relatedTarget)))hideTip()})}
 function hash(){const th=document.documentElement.dataset.theme,s=state;
-  const h=`#l=${LANG}${th?"&t="+th:""}&b=${s.basis}&sc=${s.scope}&src=${s.src}&y=${s.year}${s.high?"&c=h":""}${s.stat?"&st=1":""}&sp=${s.split}${s.island?"&i="+encodeURIComponent(s.island):""}${s.province?"&p="+encodeURIComponent(s.province):""}`;
+  const h=`#l=${LANG}${th?"&t="+th:""}&b=${s.basis}&sc=${s.scope}&src=${s.src}&y=${s.year}${s.high?"&c=h":""}${s.stat?"&st=1":""}&sp=${s.split}&dy=${s.dy}${s.island?"&i="+encodeURIComponent(s.island):""}${s.province?"&p="+encodeURIComponent(s.province):""}`;
   history.replaceState(null,"",h);$("#nav-rank").href=`dashboard.html#l=${LANG}${th?"&t="+th:""}`}
 function readHash(){const h=new URLSearchParams(location.hash.slice(1));
   LANG=h.get("l")==="id"||h.get("l")==="en"?h.get("l"):((navigator.language||"").toLowerCase().startsWith("id")?"id":"en");
   if(h.get("t")==="dark"||h.get("t")==="light")document.documentElement.dataset.theme=h.get("t");
   const s=state;if(h.get("b")==="peat")s.basis="peat";if(["in","out"].includes(h.get("sc")))s.scope=h.get("sc");if(h.get("src")==="modis")s.src="modis";
-  if(VY.includes(+h.get("y")))s.year=+h.get("y");s.high=h.get("c")==="h";s.stat=h.get("st")==="1";if(SPLITS[h.get("sp")])s.split=h.get("sp");
+  if(VY.includes(+h.get("y")))s.year=+h.get("y");s.high=h.get("c")==="h";s.stat=h.get("st")==="1";if(SPLITS[h.get("sp")])s.split=h.get("sp");if(VY.includes(+h.get("dy")))s.dy=+h.get("dy");
   if(h.get("i"))s.island=h.get("i");if(h.get("p"))s.province=h.get("p")}
 function applyStatic(){document.documentElement.lang=LANG;$$("[data-i18n]").forEach(el=>{el.textContent=t(el.dataset.i18n)});document.title=t("Fire by land status");
   $("#psearch").placeholder=t("Search province");
@@ -215,9 +334,8 @@ function update(){
   filterKeys();buildFilters();
   const T=aggregate(()=>"all").get("all")||blank();
   kpis(T,aggregate(SPLITS.concession.of),aggregate(SPLITS.forest.of),aggregate(SPLITS.dmpg.of));
-  matrix();
   const sp=SPLITS[state.split],cls=aggregate(sp.of),shown=sp.classes.filter(c=>cls.has(c[0])&&(cls.get(c[0]).area>0||cls.get(c[0]).sel>0));
-  classTable(cls,shown);charts(cls,shown,T);provinces();hash()}
+  donut();fireLand(T);mosaic();classTable(cls,shown);heat();charts(T);timesBurned();provinces();hash()}
 
 readHash();applyStatic();
 $("#psearch").oninput=e=>{state.q=e.target.value;provinces()};
