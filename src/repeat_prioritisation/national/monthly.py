@@ -5,7 +5,7 @@
 
 Same hotspots as `repeat-national-tenure`: VIIRS SNPP 2012-2026 (standard product, then the 2026 standard and near-real-time
 files), vegetation-fire type 0 where the file has a type, medium (n) and high (h) confidence kept apart, on peat cells of the
-GFW peat extent. Results of each KHG are cached in <out>/monthly/cache/<khg_id>.json, so an interrupted run resumes. Writes
+peat extent (peat.extent). Results of each KHG are cached in <out>/monthly/cache/<khg_id>.json, so an interrupted run resumes. Writes
 <out>/monthly/hotspot_month_year.csv: khg_id, year, month, conf, n (only months with a detection).
 """
 from __future__ import annotations

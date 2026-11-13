@@ -105,9 +105,18 @@ def now_points(cfg, g):
 
 
 def peat_shape(cfg, g, tol_m):
-    """The peat cells of the GFW extent inside g as one lon/lat geometry, for the map only; None when the extent is missing.
+    """The peat inside g as one lon/lat geometry, for the map only (the polygons of peat.vector, else the raster cells); None when missing.
     The cell outline is simplified in the equal-area projection by tol_m metres and pieces smaller than one 76 m cell are dropped;
     the rates sample the native raster, not this shape."""
+    vec = (cfg.get("peat") or {}).get("vector")
+    if vec and Path(vec).exists():   # the peat polygons themselves (KLH extent), clipped and simplified like the raster outline
+        import pyogrio
+        v = pyogrio.read_dataframe(vec, mask=g, columns=[])
+        if not len(v):
+            return None
+        u = to_aea(shapely.intersection(shapely.make_valid(shapely.union_all(v.geometry.values)), g)).simplify(tol_m, preserve_topology=True)
+        keep = [p for p in (u.geoms if u.geom_type.startswith(("Multi", "Geometry")) else [u]) if p.geom_type == "Polygon" and p.area > 76.0 ** 2]
+        return from_aea(shapely.MultiPolygon(keep)) if keep else None
     pe = peat_path(cfg)
     if not pe:
         return None

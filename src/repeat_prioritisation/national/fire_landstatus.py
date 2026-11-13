@@ -13,7 +13,7 @@ same area). In each tile every layer is rasterised on that grid (a cell takes a 
   licence      business licences 2025, one bit per type (oil palm, mining, plantation forest PPHTR, forest concession PBPH, and
                community forest PPHKM), so overlapping licences keep every type
   dmpg         Desa Mandiri Peduli Gambut village land (SiTMAT portal)
-  peat         GFW composite peat extent (nearest cell; 255 where the peat tile was not fetched)
+  peat         KLH peat (PPEG 2026) on this grid (peat.extent; nearest cell; 255 where the raster has no value)
   burned       KLHK burnt-area polygons 2015-2026, one bit per year (BA_yyyy)
 Cells with the same values are counted together. Hotspots take the values of the cell they fall in:
   MODIS 2026   KLH file to its last date, FIRMS MODIS NRT after it (hotspots_modis_2026.gpkg); low, medium, high kept apart
@@ -251,7 +251,7 @@ def one_tile(ij):
         nburn = sum(((burn >> n) & 1) for n in range(len(ycols))).astype("uint16")
         bands = [(kws_r, "kawasan: 0 not mapped, 1 conservation, 2 protection, 3 production, 4 convertible, 5 APL, 6 water or undefined"),
                  (conc, "concession: 0 none, 1 oil palm, 2 mining, 3 PPHTR, 4 PBPH (first type), 5 PPHKM only"),
-                 (dm_r, "DMPG village: 1 yes"), (peat_c, "peat: 0 no, 1 yes, 3 not fetched"), (khg_r, "KHG index (khg_index.csv), 0 outside"),
+                 (dm_r, "DMPG village: 1 yes"), (peat_c, "peat: 0 no, 1 yes, 3 no information"), (khg_r, "KHG index (khg_index.csv), 0 outside"),
                  (nburn, f"number of burn years {y_a}-{y_b}"), (burn, f"burn years: bit n = burned in {y_a} + n")]
         f = raster_path(cfg, (i, j))
         f.parent.mkdir(parents=True, exist_ok=True)
@@ -404,7 +404,7 @@ Bands of `status.vrt` (a paletted/unique-values renderer per band works best):
 1. kawasan: 0 not mapped, 1 conservation, 2 protection forest, 3 production forest (HP, HPT), 4 convertible production (HPK), 5 other land use (APL), 6 water or undefined
 2. concession: 0 none, 1 oil palm, 2 mining, 3 plantation forest (PPHTR), 4 forest concession (PBPH), 5 community forest (PPHKM) only; overlapping licences take the first type in this order
 3. DMPG village: 0 no, 1 yes
-4. peat (GFW composite): 0 no, 1 yes, 3 peat tile not fetched
+4. peat (KLH peat land map, PPEG 2026): 0 no, 1 yes, 3 no peat information
 5. KHG index (see `../khg_index.csv`), 0 outside every KHG
 6. number of years burned, 2015-2026 (KLHK burned area)
 7. burn years as bits: bit n set = burned in 2015 + n (2015 = 1, 2016 = 2, 2017 = 4, ... 2026 = 2048)
@@ -503,7 +503,7 @@ def collect(cfg, sel, dist, viirs_cut):
                        "peat": str(O.peat_path(cfg)), "modis": s["modis"], "viirs": s["viirs"]},
             "static_radius_m": s["static_radius_m"], "viirs_last": str(viirs_cut.date()),
             "modis_last": str(last_date(cfg, s["modis"]).date()),
-            "kawasan_codes": KWS_CODES, "licence_bits": LIC_BITS, "peat_codes": {"0": "not peat", "1": "peat", "3": "peat tile not fetched"}}
+            "kawasan_codes": KWS_CODES, "licence_bits": LIC_BITS, "peat_codes": {"0": "not peat", "1": "peat", "3": "no peat information"}}
     meta["raster_bands"] = "layers/status.vrt: 7 uint16 bands, nodata 65535 outside village land; each band carries its meaning as its description"
     (out / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     layers(cfg, pts, dist)

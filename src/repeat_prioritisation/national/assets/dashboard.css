@@ -230,3 +230,7 @@ button.ghost.on{background:var(--ink);color:var(--surface);border-color:var(--in
 .p-mid:has(#p-ov-panel:empty) .charts{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:1180px){.p-mid,.p-mid:has(#p-ov-panel:empty){grid-template-columns:minmax(0,1fr)}.p-mid:has(#p-ov-panel:empty) .charts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){.p-mid:has(#p-ov-panel:empty) .charts{grid-template-columns:minmax(0,1fr)}}
+
+.nav{display:flex;gap:4px;margin-top:6px}
+.nav a{font-size:13px;color:var(--ink2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:2px 12px}
+.nav a.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}

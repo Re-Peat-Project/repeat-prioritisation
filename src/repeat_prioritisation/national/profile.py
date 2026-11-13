@@ -64,7 +64,7 @@ DEFAULTS = {
     "hotspots": {"confidence": ["n", "h"], "types": [0]},   # FIRMS VIIRS: l/n/h; type 0 = vegetation fire
     "tma": {"path": None, "kinds": ["concession"], "drop_flags": ["range", "spike"], "threshold_m": 0.4,
             "min_days": 30},   # SiTMAT processed folder; one season only, so reported per KHG, not scored
-    "peat": {"extent": None, "global": None, "basis": "peat", "min_peat_km2": 25},   # GFW peat extent GeoTIFF; basis: rates per km2 of peat | of KHG
+    "peat": {"extent": None, "global": None, "basis": "peat", "min_peat_km2": 25},   # peat raster (0/1, 255 unknown; KLH peat on the 30 m grid); basis: rates per km2 of peat | of KHG
     "min_area_km2": 10,        # smaller KHG are profiled but not ranked: one hotspot is a huge density
     "indicators": {            # weights of the scored indicators; others are reported only
         "u_fire_freq": {"weight": 2.0},      # mean annual burned share of the KHG
@@ -141,8 +141,8 @@ def _read_mask(path, geom, **kw):
 
 
 class PeatSampler:
-    """Peat (1), no peat (0) or tile not fetched (255) from the GFW peat-extent GeoTIFF (Web Mercator, see
-    repeat_common.fetch_peat_extent). Reads one KHG window at a time."""
+    """Peat (1), no peat (0) or unknown (255) from a peat raster in any CRS (peat.extent: KLH peat on the 30 m grid; the GFW
+    composite of repeat_common.fetch_peat_extent reads the same way). Reads one KHG window at a time."""
 
     def __init__(self, path):
         from pyproj import Transformer

@@ -174,7 +174,7 @@ function tableCols(){
     {t:"KHG",tip:t("Peat hydrological unit. Click a row to open its profile."),get:i=>K.name[i]},
     {t:t("Province"),tip:t("Province in the official KHG table (SK.129/MENLHK/2017)."),get:i=>K.prov[i]},
     {t:t("Island"),tip:t("Island group."),get:i=>K.island[i]},
-    {t:t("Peat km2"),tip:t("Peat area inside the KHG, from the GFW peat extent."),get:i=>K.peat[i],num:1,nd:0,unit:"km2"},
+    {t:t("Peat km2"),tip:t("Peat area inside the KHG, from KLH's peat land map (PPEG 2026)."),get:i=>K.peat[i],num:1,nd:0,unit:"km2"},
     {t:t("Score"),tip:t("Weighted mean of the parameters, scaled 0 to 1."),get:i=>isFinite(R.score[i])?R.score[i]:null,num:1,nd:2,unit:t("0 to 1")},
     ...PR.map((p,k)=>({t:t(p.label),tip:paramTip(p),get:i=>val(k,i),num:1,nd:/%/.test(p.unit)?1:2,unit:t(p.unit),param:1})),
     ...(K.lf_prot?[["lf_prot","Conservation and protection forest","Share of the KHG area in conservation areas and protection forest (HL), forest area function 2023."],["lf_prod","Production forest","Share of the KHG area in production forest (HP, HPT) and convertible production forest (HPK)."],["lf_apl","Other land use (APL)","Share of the KHG area outside the forest area (APL)."],["lf_dmpg","DMPG villages","Share of the KHG area inside DMPG villages of the SiTMAT layer."]]
@@ -361,7 +361,7 @@ function renderProfile(){
   const info=P?P.info:null;
   const tileTips=[t("Rank among the KHG that pass the filters, at your weights. The arrow is the change against the default weights."),
     t("Weighted mean of the parameters, scaled 0 to 1."),
-    t("Peat area inside the KHG, from the GFW peat extent. Below it: the peat share of the KHG, and the share in the 1 km Global Peatland Map."),
+    t("Peat area inside the KHG, from KLH's peat land map (PPEG 2026). Below it: the peat share of the KHG, and the share in the 1 km Global Peatland Map."),
     t("MODIS hotspots on peat this year, medium and high confidence (high only when the filter is set). Ranks are by density (per km2 of peat) and by count."),
     t("SiTMAT loggers inside the KHG, 2026 season: share of days with the water table deeper than 0.4 m."),
     t("High: canals are mapped, there is enough fire signal and enough peat. Medium: two of the three. Low: fewer.")];
@@ -647,7 +647,7 @@ function drawMap(P,P2){
   const tools=$("#p-tools");tools.innerHTML="";
   if(P){const lb0=document.createElement("span");lb0.className="lab";lb0.textContent=t("Layers");tools.appendChild(lb0)}
   if(!P){$("#p-foot").textContent="";$("#p-ov-leg").innerHTML="";return}
-  const T=[["peat","Peat extent",`<i class="poly" style="background:var(--peat)"></i>`,"Peat extent used for the rates (GFW composite, 76 m): the area that burned area and hotspots are divided by."],["burn","Burned, times",`<i class="poly" style="background:var(--burn1)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. A stronger shade means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
+  const T=[["peat","Peat extent",`<i class="poly" style="background:var(--peat)"></i>`,"Peat extent used for the rates (KLH peat land map, PPEG 2026): the area that burned area and hotspots are divided by."],["burn","Burned, times",`<i class="poly" style="background:var(--burn1)"></i>`,"Burnt-area polygons by number of burns, 2015 to 2025. A stronger shade means burned more often."],["p","Primary canals",`<i style="background:var(--canal);height:4px"></i>`,"Primary canals (Kanal Primer) from the OSM-based layer."],["s","Secondary",`<i style="background:var(--canal);height:2px"></i>`,"Secondary canals (Kanal Sekunder)."],["t","Tertiary",`<i style="background:var(--canal);height:1px;opacity:.6"></i>`,"Tertiary canals (Kanal Tersier)."],["now","Hotspots this year ({n})",`<i class="dot" style="background:var(--now)"></i>`,"MODIS hotspots this year. Filled: on peat. Hollow: off peat. Large: high confidence."]];
   T.forEach(([k,tx,ic,tp])=>{const s=document.createElement("span");s.className="tg"+(pLayers[k]?"":" off");s.innerHTML=ic+t(tx,{n:nowCounts()});if(k==="now")nowLab={s,ic,tx};s.dataset.tip=t(tp);s.onclick=()=>{pLayers[k]=!pLayers[k];s.classList.toggle("off",!pLayers[k]);applyLayerToggles()};tools.appendChild(s)});
   {const ms=P.now_m.map(m=>m[0]);
     if(ms.length){
@@ -740,7 +740,7 @@ function renderOv(P){
   if(val("dmpg","in")[0]>0){
     groups.push({layer:"dmpg_prog",title:"DMPG programme",tip:"Programme of the DMPG villages: DMPG, or DMPG together with DMPM. Share of the KHG's peat, burned peat and hotspots.",rows:mkRows("dmpg_prog",OVCLS.dmpg_prog.map(a=>a[0]))});
     groups.push({layer:"dmpg_forest",title:"Kawasan hutan in DMPG villages",tip:"Forest area function of the land inside DMPG villages only: how much of the KHG's peat, burned peat and hotspots lies in village land that is also forest area. Bars are shares of the whole KHG, so they fill only as far as the villages reach.",rows:mkRows("dmpg_forest",OVCLS.forest.map(a=>a[0]))}) }
-  const rowLab=[["Peat area","Peat area in each class, from the GFW peat extent."],["Burned peat","Peat that burned at least once in 2015 to 2025 (burnt-area polygons)."],["Hotspots this year","MODIS hotspots on peat this year, medium and high confidence."]];
+  const rowLab=[["Peat area","Peat area in each class, from KLH's peat land map."],["Burned peat","Peat that burned at least once in 2015 to 2025 (burnt-area polygons)."],["Hotspots this year","MODIS hotspots on peat this year, medium and high confidence."]];
   const totTxt=[fmt(tot[0],0)+" km2",fmt(tot[1],0)+" km2",fmt(tot[2],0)];
   let html=`<div class="ovhead"><h3 class="hasTip"${tipAttr(t("Where the peat, the burned peat and this year's hotspots fall on each land-status layer. A segment wider in the lower bars than in the top bar means fire is over-represented in that class."))}>${t("Land status of the peat")}</h3></div><div class="ovgrid">`;
   groups.forEach(g=>{
@@ -792,7 +792,7 @@ function staticTips(){
   const T=(el,html)=>{if(el)el.dataset.tip=t(html)};
   const presetTips={"Default":"The provisional default weights.","History":"Default weights with this year's parameters set to 0.","This year":"Only hotspots this year, weight 1. Everything else 0.","Canals":"Only the three canal parameters, at their default weights.","Equal":"Every parameter at weight 1."};
   $$("#presets button").forEach(b=>T(b,presetTips[b.dataset.p]));
-  T($("#minpeat").closest(".ctl"),"Peat area of a KHG, from the GFW peat extent. KHG with less peat than this are not ranked.");
+  T($("#minpeat").closest(".ctl"),"Peat area of a KHG, from KLH's peat land map. KHG with less peat than this are not ranked.");
   T($("#islands"),"Rank only the KHG on the chosen islands. Each parameter is scaled using only these KHG.");
   T($("#missing"),"How a KHG with no mapped canals is scored. Ignore: its canal parameters are left out. Average: it gets the average KHG value.");
   T($("#conf"),"Confidence levels of this year's KLH hotspots that count. High only keeps the detections KLH rates Tinggi; the ranking and the profile numbers follow.");
@@ -811,7 +811,7 @@ function buildNotes(){
   const isl=Object.entries(pi).filter(e=>e[1][2]>=10).map(([n,a])=>t("{n} {a}% against {b}%",{n,a:Math.round(a[0]*100),b:Math.round(a[1]*100)})).join(", ");
   const items=[
     t("Each parameter is scaled from 0 to 1 between the 5th and 95th percentile of the KHG that pass the filters. The score is the weighted mean of the parameters a KHG has."),
-    t("Fire is counted on peat and divided by peat area. Peat comes from the GFW extent. In the median KHG it is lower than the 1 km Global Peatland Map: {isl}.",{isl}),
+    t("Fire is counted on peat and divided by peat area. Peat comes from KLH's peat land map (PPEG 2026). Peat share of the median KHG against the 1 km Global Peatland Map: {isl}.",{isl}),
     t("Hotspots 2015 to 2025 are VIIRS. Hotspots this year are MODIS, 1 Jan to {date}: the KLH file to {klh}, NASA FIRMS MODIS NRT after it, medium and high confidence. Over the days both cover, every KLH point is in FIRMS and FIRMS has about 4% more. The sensors differ from VIIRS, so they are separate parameters.",{date:nowDate(),klh:klhDate()}),
     t("Land status (kawasan hutan, peat function, DMPG villages) is counted on a regular grid of points inside the KHG, so areas are point counts times the cell area. DMPG villages are the SiTMAT layer of 838 villages. Context, not scored."),
     t("Canals come from an OSM-based layer. A KHG with no mapped canals is scored on its other parameters, or on the average value with the switch set to Average."),
@@ -836,7 +836,7 @@ function setLang(l){
   mapLabels(nat);PS.forEach(S=>mapLabels(S.m));
   render();history.replaceState(null,"",hashState());
 }
-function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.conf==="h"?"&c=h":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}${state.cmp?"&k2="+encodeURIComponent(state.cmp):""}`}
+function hashState(){const w=state.w.map(x=>+x.toFixed(2)).join(",");const th=document.documentElement.dataset.theme;{const nf=document.getElementById("nav-fire");if(nf)nf.href=`fire.html#l=${LANG}${th?"&t="+th:""}`}return `#w=${w}&p=${state.minPeat}&m=${state.missing}&v=${state.view}${th?"&t="+th:""}${LANG==="id"?"&l=id":""}${state.conf==="h"?"&c=h":""}${state.islands.size?"&i="+encodeURIComponent([...state.islands].join(",")):""}${state.sel?"&k="+encodeURIComponent(state.sel):""}${state.cmp?"&k2="+encodeURIComponent(state.cmp):""}`}
 function readHash(){
   const h=new URLSearchParams(location.hash.slice(1));
   if(h.get("l")==="id"||h.get("l")==="en")LANG=h.get("l");else LANG=(navigator.language||"").toLowerCase().startsWith("id")?"id":"en";

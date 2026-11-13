@@ -12,7 +12,9 @@ now:                                     # KLH-curated current-year hotspots (MO
   year: 2026
 hotspots: {confidence: [n, h], types: [0]}   # FIRMS VIIRS: drop low confidence (l) and non-vegetation-fire types
 peat:
-  extent: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif   # python -m repeat_common.fetch_peat_extent (GFW composite peat extent: union of Miettinen et al. 2016 and Gumbricht et al. 2017 for Indonesia)
+  extent: ${REPEAT_DATA}/peat/ppeg_lahan_gambut_2026_30m.tif   # KLH peat (PPEG LAHAN_GAMB, April 2026) on the fire tally's 30 m grid: repeat-national-ppeg --layers, then --peat-raster <this config>
+  vector: ${REPEAT_DATA}/peat/ppeg_lahan_gambut_2026.gpkg       # the same peat as polygons (native copy), drawn on the dashboard map
+  gfw: ${REPEAT_DATA}/peat_extent_gfw_v20230315_z11.tif        # GFW composite (Miettinen 2016 + Gumbricht 2017): cross-check only
   global: ${REPEAT_DATA}/peat_extent_gpm2022_1km.tif   # Global Peatland Map 2.0, 1 km: independent cross-check (non-commercial licence)
   basis: peat            # fire counted on peat only and divided by peat area; 'area' = per km2 of KHG, all land
   min_peat_km2: 25       # KHG with less peat are profiled but not ranked

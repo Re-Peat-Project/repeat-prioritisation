@@ -232,7 +232,7 @@ def build(cfg, top_n, out_path):
         row = prof[prof.khg_id == k].iloc[0].copy()
         row["geom"] = khg.loc[k, "geometry"]
         yr = yearly[yearly.khg_id == k]
-        den = float(row.peat_km2) if pd.notna(row.get("peat_km2")) else float(row.area_km2)
+        den = (float(row.peat_km2) if pd.notna(row.get("peat_km2")) else float(row.area_km2)) or None   # a KHG without peat has no burned share of peat
         burned = yr[yr.metric == "burned_peat_km2"].set_index("year").value.to_dict()
         hs = yr[yr.metric == "n_hotspot_peat"].set_index("year").value.to_dict()
         now_m = [[m, int(yr[yr.metric == f"hs_now_peat_m{m:02d}"].value.sum()), int(yr[yr.metric == f"hs_now_all_m{m:02d}"].value.sum())]
@@ -241,7 +241,7 @@ def build(cfg, top_n, out_path):
         lay = profile_layers(cfg, type("R", (), {"geom": row["geom"], "area_km2": row.area_km2})(), nb, feats, k)
         lc = [[lab, round(100 * float(row[c]), 1)] for c, lab in LC if c in row and pd.notna(row[c]) and float(row[c]) > 0.0005]
         profiles[k] = {
-            "lay": lay, "burned": [[y, round(100 * burned.get(y, 0) / den, 3)] for y in range(2015, 2027)],
+            "lay": lay, "burned": [[y, round(100 * burned.get(y, 0) / den, 3) if den else None] for y in range(2015, 2027)],
             "hs": [[y, int(hs.get(y, 0))] for y in range(2012, 2026)], "now_m": now_m,
             "deficit": ser("deficit_mm"), "rain": ser("rain_dry_season_mm"), "lc": lc,
             "info": {
@@ -366,6 +366,8 @@ def main(argv=None):
         cache.write_text(json.dumps({"data": data, "profiles": profiles}, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     attach_monthly(cfg["out"], profiles)
     assemble(data, profiles, out)
+    from repeat_prioritisation.national import fire_page
+    fire_page.build(cfg, Path(out).with_name("fire.html"))    # the second page, linked from the header
     if not a.reassemble and not a.no_tiles:
         tiles.run(cfg["out"])
 

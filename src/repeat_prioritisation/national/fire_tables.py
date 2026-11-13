@@ -8,7 +8,8 @@ Reads <out>/fire_landstatus/cells.parquet and hotspots.parquet and writes, in th
                      burned_2plus_ha (2015-2026)
   hot.parquet        the same classes and source, year, month, conf, static, ytd -> n
   khg.parquet        per KHG and the same classes (no province) -> area and burned measures
-  tables/*.csv       report tables, each with `basis` = all (all land) or peat (GFW peat extent cells):
+  tables/*.csv       report tables, each with `basis` = all (all land) or peat (KLH peat cells):
+                     t_times_burned (area burned 0, 1, 2, 3, 4+ times in the burn years, by concession, forest group, DMPG)
                      t_national, t_concession_x_forest, t_licence_type, t_forest_function, t_dmpg, t_island, t_province, t_khg,
                      t_hotspots_year (VIIRS per year and land status, full year and year to date), t_modis_month
   hotspots_outside_villages.csv  hotspots outside the village boundaries (sea, neighbouring countries), left out of every table
@@ -251,6 +252,12 @@ def main(argv=None):
             t = t[t["khg_id"] != ""]
         t.to_csv(tdir / f"{name}.csv", index=False)
         out[name] = t
+    # times burned in the burn years (KLHK flags; a cell that burned in n different years counts as burned n times)
+    A["times_burned"] = sum(((A["burn"].to_numpy() >> n) & 1) for n in range(len(years))).clip(0, 4)
+    tb = (A[A["kab"] > 0].groupby(["basis", "concession_any", "forest_group", "dmpg", "times_burned"])["area_ha"].sum()
+          .unstack(fill_value=0.0).reindex(columns=range(5), fill_value=0.0))
+    tb.columns = ["unburned_ha", "burned_1x_ha", "burned_2x_ha", "burned_3x_ha", "burned_4plus_ha"]
+    tb.round(2).reset_index().to_csv(tdir / "t_times_burned.csv", index=False)
     # licence types, non-exclusive: one block per type over the cells that carry that bit
     rows = []
     for name, bit in [("sawit", 1), ("tambang", 2), ("pphtr", 4), ("pbph", 8), ("pphkm", 16)]:
