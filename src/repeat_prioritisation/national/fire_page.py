@@ -23,7 +23,32 @@ ASSETS = Path(__file__).parent / "assets"
 DIMS = ["island", "province", "in_khg", "forest_group", "kawasan", "concession", "lic_bits", "dmpg", "peat"]
 
 
-def payload(src):
+def dmpg_reference(area, hot, years):
+    """VIIRS hotspots per 100 km2 of KLH peat in DMPG villages and on other peat, in the provinces that hold DMPG village peat, per
+    year over the same window (medium and high confidence, static left out): the series the page draws at default filters."""
+    pa = area[area["peat"] == 1]
+    prov = sorted(pa.loc[pa["dmpg"], "province"].unique())
+    pa = pa[pa["province"].isin(prov)]
+    ar = pa.groupby("dmpg")["area_ha"].sum()
+    h = hot[(hot["source"] == "viirs") & hot["ytd"] & ~hot["static"] & (hot["peat"] == 1) & hot["province"].isin(prov) & hot["year"].between(years[0], years[1])]
+    n = h.groupby(["year", "dmpg"])["n"].sum().unstack(fill_value=0)
+    return {"provinces": prov, "rates": {int(y): [round(float(r.get(True, 0) / ar[True] * 1e4), 3), round(float(r.get(False, 0) / ar[False] * 1e4), 3)] for y, r in n.iterrows()}}
+
+
+def first_dmpg_year(cfg):
+    """Earliest year in the DMPG layer's scheme field (Skema_DPG, e.g. '2018 Kemitraan')."""
+    if not cfg or not (cfg.get("inputs") or {}).get("dmpg"):
+        return None
+    import pyogrio
+    p = Path(cfg["data"]) / cfg["inputs"]["dmpg"]
+    if not p.exists():
+        return None
+    sk = pyogrio.read_dataframe(p, layer="dmpg_villages", columns=["Skema_DPG"], read_geometry=False)["Skema_DPG"].astype(str)
+    y = pd.to_numeric(sk.str.extract(r"((?:19|20)\d{2})")[0], errors="coerce")
+    return int(y.min()) if y.notna().any() else None
+
+
+def payload(src, cfg=None):
     area = pd.read_parquet(src / "area.parquet")
     hot = pd.read_parquet(src / "hot.parquet")
     hot = hot[hot["conf"].isin(["medium", "high"])]
@@ -35,8 +60,10 @@ def payload(src):
     a = area.merge(keys, on=DIMS)
     h = hot.merge(keys, on=DIMS)
     cls = {c: (keys[c].astype(int).tolist() if keys[c].dtype == bool or c in ("lic_bits", "peat") else keys[c].astype(str).tolist()) for c in DIMS}
+    ref = dmpg_reference(area, hot, meta["years"])
     return {
-        "meta": {k: meta[k] for k in ("cell_m", "years", "viirs_last", "modis_last", "static_radius_m")},
+        "meta": {**{k: meta[k] for k in ("cell_m", "years", "viirs_last", "modis_last", "static_radius_m")},
+                 "dmpg_first_year": first_dmpg_year(cfg), "dmpg_reference": ref},
         "cls": cls,
         "area": {"k": a["k"].tolist(), "ha": a["area_ha"].round(1).tolist(), "ever": a["burned_any_ha"].round(1).tolist(),
                  "twice": a["burned_2plus_ha"].round(1).tolist(), "x2": a["burned_2x_ha"].round(1).tolist(), "x3": a["burned_3x_ha"].round(1).tolist(), "x4": a["burned_4plus_ha"].round(1).tolist(), "burned": [a[f"burned_{y}_ha"].round(1).tolist() for y in years]},
@@ -63,7 +90,7 @@ def build(cfg, out=None):
         print(f"{src}: no fire tallies (run repeat-national-fire and repeat-national-fire-tables); fire.html not written")
         return None
     out = Path(out or Path(cfg["out"]) / "fire.html")
-    assemble(payload(src), out)
+    assemble(payload(src, cfg), out)
     return out
 
 

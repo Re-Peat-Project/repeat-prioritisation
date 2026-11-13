@@ -5,7 +5,7 @@
 
 Reads <out>/fire_landstatus/cells.parquet and hotspots.parquet and writes, in the same folder:
   area.parquet       island, province, in_khg, kawasan, licence bits, dmpg, peat -> area_ha, burned_<year>_ha, burned_any_ha,
-                     burned_2plus_ha (2015-2026)
+                     burned_2plus_ha (fire_landstatus.years)
   hot.parquet        the same classes and source, year, month, conf, static, ytd -> n
   khg.parquet        per KHG and the same classes (no province) -> area and burned measures
   tables/*.csv       report tables, each with `basis` = all (all land) or peat (KLH peat cells):
@@ -14,7 +14,7 @@ Reads <out>/fire_landstatus/cells.parquet and hotspots.parquet and writes, in th
                      t_hotspots_year (VIIRS per year and land status, full year and year to date), t_modis_month
   hotspots_outside_villages.csv  hotspots outside the village boundaries (sea, neighbouring countries), left out of every table
   checks.csv         totals that must agree: area and hotspots across tables, burned area against the exact polygon area
-Default hotspot counts: medium and high confidence, static sources left out; MODIS 2026 is the KLH series (headline), VIIRS the
+Default hotspot counts: medium and high confidence, static sources left out; MODIS of the last year is the KLH series (headline), VIIRS the
 trend. A licence type table counts overlapping licences once per type, so its rows do not add up; the concession rows do.
 """
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from repeat_prioritisation.national import fire_common as C
 from repeat_prioritisation.national import fire_landstatus as F
-from repeat_prioritisation.national import land as L
 
 log = logging.getLogger("prioritas.fire_tables")
 
@@ -79,16 +79,17 @@ def add_basis(df):
 
 
 def measures(area, hot, dims, years, viirs_years):
+    now = years[-1]
     """Area, burned and hotspot measures by `dims` (+ basis). Hotspots: medium and high confidence, static left out."""
     num = ["area_ha"] + [f"burned_{y}_ha" for y in years] + ["burned_any_ha", "burned_2plus_ha"]
     a = area.groupby(["basis"] + dims, as_index=False)[num].sum()
     h = hot[hot["conf"].isin(["medium", "high"]) & ~hot["static"]]
     parts = []
     m = h[h["source"] == "modis"]
-    parts.append(m.groupby(["basis"] + dims)["n"].sum().rename("modis_2026_n"))
-    parts.append(m[m["conf"] == "high"].groupby(["basis"] + dims)["n"].sum().rename("modis_2026_high_n"))
+    parts.append(m.groupby(["basis"] + dims)["n"].sum().rename(f"modis_{now}_n"))
+    parts.append(m[m["conf"] == "high"].groupby(["basis"] + dims)["n"].sum().rename(f"modis_{now}_high_n"))
     s = hot[(hot["source"] == "modis") & hot["static"] & hot["conf"].isin(["medium", "high"])]
-    parts.append(s.groupby(["basis"] + dims)["n"].sum().rename("modis_2026_static_n"))
+    parts.append(s.groupby(["basis"] + dims)["n"].sum().rename(f"modis_{now}_static_n"))
     v = h[h["source"] == "viirs"]
     for y in viirs_years:
         parts.append(v[v["year"] == y].groupby(["basis"] + dims)["n"].sum().rename(f"viirs_{y}_n"))
@@ -102,22 +103,24 @@ def measures(area, hot, dims, years, viirs_years):
 
 
 def summary_attrs(A, H, key, years):
-    """One row per `key` value (all land): area, peat, burned per year and 2015-2025, MODIS 2026 hotspots (medium + high, static left
-    out), rate per 100 km2, and the shares of burned area 2015-2025 and of hotspots inside concessions, forest area and DMPG villages."""
-    past = [f"burned_{y}_ha" for y in years if y <= 2025]
-    a = A[A["basis"] == "all"].assign(burned_1525_ha=lambda x: x[past].sum(axis=1))
+    """One row per `key` value (all land): area, peat, burned per year and over the past years (all but the last), MODIS hotspots of
+    the last year (medium + high, static left out), rate per 100 km2, and the shares of the past burned area and of the hotspots inside
+    concessions, forest area and DMPG villages. Column names carry two-digit years: burned_1525_ha, modis26 for 2015-2026."""
+    past = [f"burned_{y}_ha" for y in years[:-1]]
+    b, m = f"burned_{years[0] % 100:02d}{years[-2] % 100:02d}_ha", f"modis{years[-1] % 100:02d}"
+    a = A[A["basis"] == "all"].assign(**{b: lambda x: x[past].sum(axis=1)})
     h = H[(H["basis"] == "all") & (H["source"] == "modis") & H["conf"].isin(["medium", "high"]) & ~H["static"]]
-    out = a.groupby(key)[["area_ha", "burned_1525_ha"] + [f"burned_{y}_ha" for y in years]].sum()
+    out = a.groupby(key)[["area_ha", b] + [f"burned_{y}_ha" for y in years]].sum()
     out["peat_ha"] = A[A["basis"] == "peat"].groupby(key)["area_ha"].sum()
-    out["modis26"] = h.groupby(key)["n"].sum()
-    out["modis26_peat"] = h[h["peat"] == 1].groupby(key)["n"].sum()
+    out[m] = h.groupby(key)["n"].sum()
+    out[f"{m}_peat"] = h[h["peat"] == 1].groupby(key)["n"].sum()
     for name, m_a, m_h in (("conc", a["concession_any"], h["concession_any"]), ("kws", a["forest_group"] == "kawasan", h["forest_group"] == "kawasan"),
                            ("dmpg", a["dmpg"], h["dmpg"])):
         out[f"area_{name}_pct"] = 100 * a[m_a].groupby(key)["area_ha"].sum() / out["area_ha"]
-        out[f"burned_{name}_pct"] = 100 * a[m_a].groupby(key)["burned_1525_ha"].sum() / out["burned_1525_ha"]
-        out[f"modis26_{name}_pct"] = 100 * h[m_h].groupby(key)["n"].sum() / out["modis26"]
+        out[f"burned_{name}_pct"] = 100 * a[m_a].groupby(key)[b].sum() / out[b]
+        out[f"{m}_{name}_pct"] = 100 * h[m_h].groupby(key)["n"].sum() / out[m]
     out = out.fillna({c: 0 for c in out.columns if not c.endswith("_pct")})
-    out["modis26_per100km2"] = out["modis26"] / out["area_ha"] * 1e4
+    out[f"{m}_per100km2"] = out[m] / out["area_ha"] * 1e4
     return out.round(2).reset_index()
 
 
@@ -145,8 +148,7 @@ def summary_layers(cfg, d, A, H, years):
     if tmp.exists():
         tmp.unlink()
     prov.to_file(tmp, layer="province", driver="GPKG")
-    from repeat_prioritisation.national import profile as P
-    khg = P.load_khg(cfg)[["khg_id", "nama", "geometry"]]
+    khg = C.load_khg(cfg)[["khg_id", "nama", "geometry"]]
     kk = summary_attrs(A[A["khg_id"] != ""], H[H["khg_id"] != ""], "khg_id", years)
     khg.merge(kk, on="khg_id", how="left").to_file(tmp, layer="khg", driver="GPKG")
     tmp.replace(out)
@@ -206,7 +208,12 @@ def main(argv=None):
     ap.add_argument("--config", required=True)
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    cfg = L.load_cfg(a.config)
+    from repeat_prioritisation.national import land as L     # the national config (dashboard package)
+    run(L.load_cfg(a.config))
+
+
+def run(cfg):
+    """The tables, checks and summary layers for a loaded config, from the tallies in <out>/fire_landstatus."""
     s = F.settings(cfg)
     d = F.out_dir(cfg)
     meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
@@ -278,7 +285,7 @@ def main(argv=None):
     for name, t in out.items():
         if name in ("t_national", "t_khg"):
             continue
-        g = t.groupby("basis")[["area_ha", "burned_any_ha", "modis_2026_n"]].sum()
+        g = t.groupby("basis")[["area_ha", "burned_any_ha", f"modis_{years[-1]}_n"]].sum()
         for b in g.index:
             for c in g.columns:
                 chk.append({"check": f"{name} sums to national", "basis": b, "measure": c, "value": float(g.loc[b, c]), "reference": float(nat.loc[b, c]),

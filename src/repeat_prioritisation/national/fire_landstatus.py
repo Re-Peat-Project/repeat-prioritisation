@@ -13,7 +13,8 @@ same area). In each tile every layer is rasterised on that grid (a cell takes a 
   licence      business licences 2025, one bit per type (oil palm, mining, plantation forest PPHTR, forest concession PBPH, and
                community forest PPHKM), so overlapping licences keep every type
   dmpg         Desa Mandiri Peduli Gambut village land (SiTMAT portal)
-  peat         KLH peat (PPEG 2026) on this grid (peat.extent; nearest cell; 255 where the raster has no value)
+  peat         KLH peat (PPEG 2026) on this grid (peat.extent; nearest cell; 255 where the raster has no value), or the peat
+               polygons themselves when `fire_landstatus.peat_vector` is set ({path, layer, where}; 0 outside them)
   burned       KLHK burnt-area polygons 2015-2026, one bit per year (BA_yyyy)
 Cells with the same values are counted together. Hotspots take the values of the cell they fall in:
   MODIS 2026   KLH file to its last date, FIRMS MODIS NRT after it (hotspots_modis_2026.gpkg); low, medium, high kept apart
@@ -52,9 +53,7 @@ from rasterio.transform import from_origin
 from rasterio.warp import reproject
 from scipy.spatial import cKDTree
 
-from repeat_prioritisation.national import land as L
-from repeat_prioritisation.national import overlay as O
-from repeat_prioritisation.national import profile as P
+from repeat_prioritisation.national import fire_common as C
 
 log = logging.getLogger("prioritas.fire")
 
@@ -66,6 +65,7 @@ DEFAULT = {"crs": "EPSG:6933", "cell_m": 30, "tile_cells": 3000, "years": [2015,
 KWS_CODES = ["cons", "hl", "prod", "hpk", "apl", "other"]          # raster value = index + 1; 0 = not mapped
 LIC_BITS = {"sawit": 1, "tambang": 2, "pphtr": 4, "pbph": 8, "pphkm": 16}
 CONF = {"l": "low", "n": "medium", "h": "high", "low": "low", "medium": "medium", "high": "high"}
+LEVEL_NAMES = {"rendah": "low", "low": "low", "sedang": "medium", "medium": "medium", "tinggi": "high", "high": "high"}
 # bit layout of the cell key
 SHIFT = {"kab": 0, "khg": 10, "kws": 20, "lic": 23, "dmpg": 28, "peat": 29, "burn": 31}
 WIDTH = {"kab": 10, "khg": 10, "kws": 3, "lic": 5, "dmpg": 1, "peat": 2, "burn": 12}
@@ -140,20 +140,25 @@ def _rast(geoms, values, shape, tr, dtype):
     return rasterize(shapes, out_shape=shape, transform=tr, fill=0, dtype=dtype, all_touched=False)
 
 
-def _hotspots(path, bbox, kind, ytd_cut):
-    """Hotspots of one file inside bbox: x, y (lon/lat), year, month, conf, ytd, typed (file has a type column)."""
-    fields = list(pyogrio.read_info(path)["fields"])
-    cols = [c for c in ("acq_date", "confidence", "type", "level", "month") if c in fields]
-    h = _vec(path, bbox, cols)
+def _hotspots(path, bbox, kind, ytd_cut, now):
+    """Hotspots of one file inside bbox: x, y (lon/lat), year, month, conf, ytd, typed (file has a type column).
+    Field names in any case. MODIS: `level` (low/medium/high, or rendah/sedang/tinggi) where present, else FIRMS `confidence` 0-100
+    (low <30, medium 30-79, high >=80, the KLH limits); `month` where present, else the month of acq_date."""
+    fields = {c.lower(): c for c in pyogrio.read_info(path)["fields"]}
+    want = [c for c in ("acq_date", "confidence", "type", "level", "month") if c in fields]
+    h = _vec(path, bbox, [fields[c] for c in want]).rename(columns={fields[c]: c for c in want})
     if not len(h):
         return None
     if "type" in h:
         h = h[h["type"] == 0]
     d = pd.to_datetime(h["acq_date"], errors="coerce") if "acq_date" in h else pd.Series(pd.NaT, index=h.index)
     if kind == "modis":
-        conf = h["level"].astype(str)
-        month = h["month"].fillna(d.dt.month).astype(int)
-        year = np.full(len(h), 2026)
+        if "level" in h:
+            conf = h["level"].astype(str).str.lower().map(LEVEL_NAMES).fillna(h["level"].astype(str))
+        else:
+            conf = pd.cut(pd.to_numeric(h["confidence"], errors="coerce"), [-1, 29, 79, 101], labels=["low", "medium", "high"]).astype(str)
+        month = (h["month"].fillna(d.dt.month) if "month" in h else d.dt.month).astype(int)
+        year = np.full(len(h), now)
         ytd = np.ones(len(h), bool)
     else:
         conf = h["confidence"].map(CONF)
@@ -194,24 +199,28 @@ def one_tile(ij):
     kws = _vec(data / inp["forest_area"], bbox, ["Fungsi"])
     kws_r = np.zeros(shape, "uint8")
     if len(kws):
-        code = kws["Fungsi"].map(O.CODE_TO_KWS).fillna("other").map({k: n + 1 for n, k in enumerate(KWS_CODES)})
+        code = kws["Fungsi"].map(C.CODE_TO_KWS).fillna("other").map({k: n + 1 for n, k in enumerate(KWS_CODES)})
         kws = kws.assign(code=code).sort_values("code", ascending=False)   # first class in KWS_CODES rasterised last, so it wins
         kws_r = _rast(kws.to_crs(crs).geometry, kws["code"], shape, tr, "uint8")
 
     lic = _vec(data / inp["licences"], bbox, ["IZIN_USAHA"])
     lic_r = np.zeros(shape, "uint8")
     if len(lic):
-        lic = lic.assign(cls=lic["IZIN_USAHA"].map(O.LIC_VALUE)).to_crs(crs)
+        lic = lic.assign(cls=lic["IZIN_USAHA"].map(C.LIC_VALUE)).to_crs(crs)
         for k, bit in LIC_BITS.items():
             sel = lic[lic["cls"] == k]
             if len(sel):
                 lic_r |= _rast(sel.geometry, [1] * len(sel), shape, tr, "uint8") * np.uint8(bit)
 
-    dm = _vec(data / inp["dmpg"], bbox, ["DESA"], layer=O.DMPG_LAYER) if inp.get("dmpg") else []
+    dm = _vec(data / inp["dmpg"], bbox, [], layer=s.get("dmpg_layer", C.DMPG_LAYER)) if inp.get("dmpg") else []
     dm_r = _rast(dm.to_crs(crs).geometry, [1] * len(dm), shape, tr, "uint8") if len(dm) else np.zeros(shape, "uint8")
 
     peat = np.full(shape, 255, "uint8")
-    if _S["peat"]:
+    pv = s.get("peat_vector")
+    if pv:                                  # peat polygons (e.g. PPEG LAHAN_GAMB = 'LAHAN GAMBUT'), cell-centre rule; 0 elsewhere
+        pg = _vec(data / pv["path"], bbox, [], layer=pv.get("layer"), where=pv.get("where"))
+        peat = _rast(pg.to_crs(crs).geometry, [1] * len(pg), shape, tr, "uint8") if len(pg) else np.zeros(shape, "uint8")
+    elif _S["peat"]:
         with rasterio.open(_S["peat"]) as src:
             reproject(rasterio.band(src, 1), peat, src_nodata=None, dst_transform=tr, dst_crs=crs, dst_nodata=255,
                       resampling=Resampling.nearest, init_dest_nodata=True)
@@ -270,7 +279,7 @@ def one_tile(ij):
         for f in files:
             if not (data / f).exists():
                 continue
-            h = _hotspots(data / f, bbox, kind, cut)
+            h = _hotspots(data / f, bbox, kind, cut, s["years"][1])
             if h is None or not len(h):
                 continue
             hx, hy = tf.transform(h["x"].to_numpy(), h["y"].to_numpy())
@@ -291,7 +300,7 @@ def one_tile(ij):
                                     "lon": h["x"].to_numpy(), "lat": h["y"].to_numpy()}))
     allh = pd.concat(hs, ignore_index=True) if hs else pd.DataFrame(columns=["key", "source", "file", "year", "month", "conf", "static", "ytd", "lon", "lat"])
     hot = allh.groupby(["key", "source", "file", "year", "month", "conf", "static", "ytd"], as_index=False).size().rename(columns={"size": "n"})
-    pts = allh[allh["year"] == 2026].reset_index(drop=True)          # this year's points, kept for review with their classes
+    pts = allh[allh["year"] == s["years"][1]].reset_index(drop=True)  # this year's points, kept for review with their classes
     return cells, hot, pd.DataFrame(chk), pts
 
 
@@ -360,25 +369,30 @@ def main(argv=None):
     ap.add_argument("--no-rasters", action="store_true", help="do not write the 30 m status and burn rasters (layers/tiles)")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
-    cfg = L.load_cfg(a.config)
+    from repeat_prioritisation.national import land as L     # the national config (dashboard package)
+    run(L.load_cfg(a.config), a.workers, a.force, a.tiles, a.summary_only, not a.no_rasters)
+
+
+def run(cfg, workers=6, force=False, tile_list=None, summary_only=False, rasters=True):
+    """The tally for a loaded config (see the module docstring); tile_list = ["i_j", ...] limits it to those tiles."""
     s = settings(cfg)
     out = out_dir(cfg)
     out.mkdir(parents=True, exist_ok=True)
     all_tiles, origin = tiles(cfg)
-    sel = [tuple(map(int, x.split("_"))) for x in a.tiles] if a.tiles else all_tiles
+    sel = [tuple(map(int, x.split("_"))) for x in tile_list] if tile_list else all_tiles
     dist = district_table(cfg)
     viirs_cut = last_date(cfg, s["viirs"][-1])
-    if not a.summary_only:
-        khg = P.load_khg(cfg)[["khg_id", "geometry"]].to_crs(s["crs"]).reset_index(drop=True)
+    if not summary_only:
+        khg = C.load_khg(cfg)[["khg_id", "geometry"]].to_crs(s["crs"]).reset_index(drop=True)
         khg["idx"] = np.arange(1, len(khg) + 1)
-        state = {"cfg": cfg, "s": s, "origin": origin, "khg": khg, "peat": str(O.peat_path(cfg) or ""),
+        state = {"cfg": cfg, "s": s, "origin": origin, "khg": khg, "peat": str(C.peat_path(cfg) or ""),
                  "kab_index": dict(zip(dist["province"] + "|" + dist["district"], dist["kab"])),
-                 "static": static_points(cfg), "viirs_cut": viirs_cut, "rasters": not a.no_rasters}
-        todo = [ij for ij in sel if a.force or not any(p.exists() for p in [cache_paths(cfg, ij)[0][0], cache_paths(cfg, ij)[1]])]
+                 "static": static_points(cfg), "viirs_cut": viirs_cut, "rasters": rasters}
+        todo = [ij for ij in sel if force or not any(p.exists() for p in [cache_paths(cfg, ij)[0][0], cache_paths(cfg, ij)[1]])]
         log.info("%d tiles, %d to compute, %d static points", len(sel), len(todo), len(state["static"]))
         khg[["khg_id", "idx"]].to_csv(out / "khg_index.csv", index=False)
-        if a.workers > 1 and len(todo) > 1:
-            with ProcessPoolExecutor(a.workers, initializer=init, initargs=(state,)) as ex:
+        if workers > 1 and len(todo) > 1:
+            with ProcessPoolExecutor(workers, initializer=init, initargs=(state,)) as ex:
                 for n, (ij, land) in enumerate(ex.map(work, todo), 1):
                     if n % 20 == 0 or n == len(todo):
                         log.info("%d / %d tiles", n, len(todo))
@@ -391,13 +405,13 @@ def main(argv=None):
 
 LAYERS_README = """# Review layers: burned area and hotspots by land status
 
-Written by `repeat-national-fire` (rasters, hotspots) and `repeat-national-fire-tables` (summary polygons). Open in QGIS.
+Written by the fire tally (`fire_landstatus`: rasters, hotspots) and its tables step (`fire_tables`: summary polygons). Open in QGIS.
 
 | File | Content |
 |---|---|
 | `status.vrt` | Mosaic of `tiles/status_<i>_<j>.tif`: the 30 m equal-area grid (EPSG:6933) the tallies were made on. 7 bands, uint16, nodata 65535 outside the 2023 village boundaries. |
-| `hotspots_2026.gpkg` | Layers `modis_2026`, `viirs_2026`: every 2026 hotspot of medium or high confidence (low is not used) with the classes it was counted under: province, district, khg_id, kawasan, concession, licence_types, dmpg, peat, static (likely gas flare, volcano or offshore source), on_land (inside the village boundaries). |
-| `summary.gpkg` | Layers `province` and `khg`: area, peat, burned area per year and 2015-2025, MODIS 2026 hotspots (medium + high, static left out), hotspots per 100 km2, and the shares (%) of area, burned area 2015-2025 and hotspots inside concessions (`conc`), forest area (`kws`) and DMPG villages (`dmpg`). |
+| `hotspots_{y1}.gpkg` | Layers `modis_{y1}`, `viirs_{y1}`: every {y1} hotspot of medium or high confidence (low is not used) with the classes it was counted under: province, district, khg_id, kawasan, concession, licence_types, dmpg, peat, static (likely gas flare, volcano or offshore source), on_land (inside the village boundaries). |
+| `summary.gpkg` | Layers `province` and `khg`: area, peat, burned area per year and {y0}-{yp}, MODIS {y1} hotspots (medium + high, static left out), hotspots per 100 km2, and the shares (%) of area, burned area {y0}-{yp} and hotspots inside concessions (`conc`), forest area (`kws`) and DMPG villages (`dmpg`). |
 
 Bands of `status.vrt` (a paletted/unique-values renderer per band works best):
 
@@ -406,10 +420,10 @@ Bands of `status.vrt` (a paletted/unique-values renderer per band works best):
 3. DMPG village: 0 no, 1 yes
 4. peat (KLH peat land map, PPEG 2026): 0 no, 1 yes, 3 no peat information
 5. KHG index (see `../khg_index.csv`), 0 outside every KHG
-6. number of years burned, 2015-2026 (KLHK burned area)
-7. burn years as bits: bit n set = burned in 2015 + n (2015 = 1, 2016 = 2, 2017 = 4, ... 2026 = 2048)
+6. number of years burned, {y0}-{y1} (KLHK burned area)
+7. burn years as bits: bit n set = burned in {y0} + n ({y0} = 1, {y0} + 1 = 2, {y0} + 2 = 4, ...)
 
-The burned-area maps of 2024 and 2026 are incomplete as delivered (see `tables/t_completeness.csv`).
+Burned-area years that are incomplete as delivered show as low hectares per hotspot in `tables/t_completeness.csv`.
 """
 
 
@@ -449,7 +463,8 @@ def layers(cfg, pts, dist):
     out = out_dir(cfg) / "layers"
     out.mkdir(parents=True, exist_ok=True)
     write_vrt(sorted((out / "tiles").glob("status_*.tif")), out / "status.vrt")
-    (out / "README.md").write_text(LAYERS_README, encoding="utf-8")
+    y0, y1 = settings(cfg)["years"]
+    (out / "README.md").write_text(LAYERS_README.format(y0=y0, y1=y1, yp=y1 - 1), encoding="utf-8")
     if not pts:
         return
     p = decode(pd.concat(pts, ignore_index=True), [n for n in SHIFT if n != "burn"])
@@ -462,11 +477,12 @@ def layers(cfg, pts, dist):
                  dmpg=p["dmpg"] > 0, peat=p["peat"].map({0: "no", 1: "yes", 3: "unknown"}), on_land=p["kab"] > 0)
     p = p[p["conf"].isin(["medium", "high"])].drop(columns=["kab", "khg", "kws", "lic", "ytd", "file", "year", "source"]).assign(source=p["source"])
     g = gpd.GeoDataFrame(p.drop(columns=["lon", "lat"]), geometry=gpd.points_from_xy(p["lon"], p["lat"]), crs=4326)
-    f = out / "hotspots_2026.gpkg"
+    now = settings(cfg)["years"][1]
+    f = out / f"hotspots_{now}.gpkg"
     if f.exists():
         f.unlink()
     for src, sub in g.groupby("source"):
-        sub.to_file(f, layer=f"{src}_2026", driver="GPKG")
+        sub.to_file(f, layer=f"{src}_{now}", driver="GPKG")
 
 
 def collect(cfg, sel, dist, viirs_cut):
@@ -500,7 +516,7 @@ def collect(cfg, sel, dist, viirs_cut):
     meta = {"crs": s["crs"], "cell_m": s["cell_m"], "tile_cells": s["tile_cells"], "tiles": len(sel), "years": s["years"],
             "inputs": {"villages": s["villages"], "khg": cfg["inputs"]["khg"], "forest_area": cfg["inputs"]["forest_area"],
                        "licences": cfg["inputs"]["licences"], "dmpg": cfg["inputs"].get("dmpg"), "burned": cfg["inputs"]["burned"],
-                       "peat": str(O.peat_path(cfg)), "modis": s["modis"], "viirs": s["viirs"]},
+                       "peat": str(C.peat_path(cfg)) if not s.get("peat_vector") else s["peat_vector"]["path"], "modis": s["modis"], "viirs": s["viirs"]},
             "static_radius_m": s["static_radius_m"], "viirs_last": str(viirs_cut.date()),
             "modis_last": str(last_date(cfg, s["modis"]).date()),
             "kawasan_codes": KWS_CODES, "licence_bits": LIC_BITS, "peat_codes": {"0": "not peat", "1": "peat", "3": "no peat information"}}

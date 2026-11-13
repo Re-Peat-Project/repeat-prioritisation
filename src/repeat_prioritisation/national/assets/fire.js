@@ -82,7 +82,7 @@ function buildFilters(){
 // ---------------------------------------------------------------- panels
 function kpis(T,conc,forest,dmpg){
   const src=state.src.toUpperCase(),Y=yr(),scope=state.province||(state.island?state.island.replace(/^Pulau /,""):t("Indonesia"));
-  const share=(m,k)=>`${pct(sumPast(m.get(k)),sumPast(T))} ${t("of burned area")} ${PAST[0]}–${PAST[1]} · ${pct(m.get(k)?.area||0,T.area)} ${t("of the area")}`;
+  const share=(m,k)=>`${f0(m.get(k)?.sel||0)} ${t("hotspots")} · ${pct(sumPast(m.get(k)),sumPast(T))} ${t("of burned area")} ${PAST[0]}–${PAST[1]}`;
   const unit=state.basis==="peat"?t("of peat"):t("of land");
   const k=(l,v,s,h)=>`<div class="kpi"${tip(h)}><div class="lab">${l}</div><div class="v">${v}</div><div class="l">${s}</div></div>`;
   $("#kpis").innerHTML=
@@ -90,30 +90,25 @@ function kpis(T,conc,forest,dmpg){
     k(`${t("Burned")} ${Y}${incomplete()?` (${t("incomplete")})`:""}`,f0(bY(T)),`ha · ${t("mean")} ${PAST[0]}–${PAST[1]}: ${f0(meanPast(T))} ha/${t("yr")}`,t("KLHK burnt-area polygons of the year, on the 30 m grid. The 2026 layer holds 0.2 ha per VIIRS hotspot against 2 to 6 ha in 2015 to 2023 and 2025: incomplete as delivered, so compare 2026 with earlier years through the hotspots. 2024 is also incomplete (0.6 ha per hotspot)."))+
     k(`${t("Hotspots")} ${Y}`,f0(T.sel),`${src}, ${state.high?t("high confidence"):t("medium + high")} · ${f1(rate(T.sel,T.area))} ${t("per 100 km²")} ${unit}`+(state.src==="viirs"?` · ×${f1(T.sel/Math.max(1,vMeanPast(T)))} ${t("mean")} ${PAST[0]}–${PAST[1]}`:""),
       state.src==="viirs"?t("VIIRS hotspots from 1 January to the last 2026 date, the same window in every year, and their ratio to the 2015 to 2025 mean."):t("MODIS hotspots of the year: KLH file, then NASA FIRMS MODIS near real time."))+
-    k(t("In concessions"),pct(conc.get("yes")?.sel||0,T.sel),share(conc,"yes"),t("Share of the selected year's hotspots (large figure), of the burned area of 2015 to 2025 and of the area (line) inside a business licence. A hotspot inside a licence is a spatial overlap, not responsibility."))+
+    k(t("In concessions"),pct(conc.get("yes")?.sel||0,T.sel),share(conc,"yes"),t("Share of the selected year's hotspots (large figure) and of the burned area of 2015 to 2025 inside a business licence. A hotspot inside a licence is a spatial overlap, not responsibility."))+
     k(t("In forest area"),pct(forest.get("kawasan")?.sel||0,T.sel),share(forest,"kawasan"),t("Share inside the forest area (kawasan hutan), with or without a licence."))+
-    k(t("In DMPG villages"),pct(dmpg.get("yes")?.sel||0,T.sel),share(dmpg,"yes"),t("Share inside DMPG village land."))}
+    k(t("In DMPG villages"),pct(dmpg.get("yes")?.sel||0,T.sel),share(dmpg,"yes"),t("Share inside DMPG village land. The villages were chosen on fire-prone peat: the chart DMPG village peat and other peat compares them with other peat over time."))}
 
 function classTable(cls,shown){
   const sp=SPLITS[state.split],Y=yr(),scope=state.province||(state.island?state.island.replace(/^Pulau /,""):t("Indonesia"));
   $("#cls-title").textContent=`${t("By")} ${t(sp.label).toLowerCase()} · ${scope}`;
   $("#splits").innerHTML=Object.keys(SPLITS).map(k=>`<button type="button" data-v="${k}" class="${k===state.split?"on":""}"${tip(t(SPLITS[k].help))}>${t(SPLITS[k].label)}</button>`).join("");
   $$("#splits button").forEach(b=>b.onclick=()=>{state.split=b.dataset.v;update()});
-  const mx=Math.max(1e-9,...shown.map(c=>rate(cls.get(c[0]).sel,cls.get(c[0]).area)||0));
   let h=`<table class="ct"><thead><tr><th></th><th${tip(t("Area of the class on the equal-area grid."))}>${state.basis==="peat"?t("Peat"):t("Land")}<br>km²</th>
     <th${tip(t("KLHK burnt-area polygons of the year. The 2026 layer is incomplete as delivered."))}>${t("Burned")} ${Y}${incomplete()?"*":""}<br>ha</th>
     <th${tip(t("Mean yearly burned area over the earlier years."))}>${t("Mean")} ${PAST[0]}–${PAST[1]}<br>ha/${t("yr")}</th>
-    <th${tip(t("Share of the class burned at least once in 2015 to 2026."))}>${t("Ever burned")}<br>%</th>
-    <th${tip(t("Share of the class burned in two or more years of 2015 to 2026."))}>${t("Burned 2+ times")}<br>%</th>
-    <th${tip(t("Hotspots of the selected sensor and year."))}>${t("Hotspots")} ${Y}</th>
-    <th style="text-align:left"${tip(t("Hotspots of the selected sensor and year per 100 km² of the class."))}>${t("per 100 km²")}</th></tr></thead><tbody>`;
-  shown.forEach(c=>{const a=cls.get(c[0]),d=rate(a.sel,a.area);
+    <th${tip(t("Area burned in two or more years of 2015 to 2026."))}>${t("Burned 2+ times")}<br>ha</th>
+    <th${tip(t("Hotspots of the selected sensor and year."))}>${t("Hotspots")} ${Y}</th></tr></thead><tbody>`;
+  shown.forEach(c=>{const a=cls.get(c[0]);
     h+=`<tr><td><i class="sw" style="background:var(${c[2]})"></i>${t(c[1])}</td><td>${f0(a.area/100)}</td><td>${f0(bY(a))}</td><td>${f0(meanPast(a))}</td>
-      <td>${a.area>0?f1(100*a.ever/a.area):"–"}</td><td>${a.area>0?f1(100*a.twice/a.area):"–"}</td><td>${f0(a.sel)}</td>
-      <td><div class="bar0"><i style="width:${(60*(d||0)/mx).toFixed(1)}%;background:var(${c[2]})"></i><span>${f1(d)}</span></div></td></tr>`});
+      <td>${f0(a.twice)}</td><td>${f0(a.sel)}</td></tr>`});
   // shares: one 100% bar each for area, burned area 2015-2025 and hotspots, segmented by class
-  const rows=[[state.basis==="peat"?t("Peat"):t("Land"),c=>cls.get(c[0]).area,t("Area of the class on the equal-area grid.")],
-    [`${t("Burned")} ${PAST[0]}–${PAST[1]}`,c=>sumPast(cls.get(c[0])),t("Burned area of 2015 to 2025, summed over the years.")],
+  const rows=[[`${t("Burned")} ${PAST[0]}–${PAST[1]}`,c=>sumPast(cls.get(c[0])),t("Burned area of 2015 to 2025, summed over the years.")],
     [`${t("Hotspots")} ${Y}`,c=>cls.get(c[0]).sel,t("Hotspots of the selected sensor and year.")]];
   h+=`</tbody></table><div class="shares"><div class="lab">${t("Share of each total")}</div>`;
   rows.forEach(([lab,f,hl])=>{const tot=shown.reduce((s,c)=>s+f(c),0);
@@ -172,24 +167,20 @@ let playing=null;
 function donut(){
   const host=$("#v-donut"),cc=aggregate(SPLITS.concession.of),Y=state.dy,yi=Y-V0;
   const g=(k,f)=>{const a=cc.get(k);return a?f(a):0};
-  const parts=[[t("Land"),g("yes",a=>a.area),g("no",a=>a.area),""],
-    [`${t("Burned")} ${Y}`,Y>=Y0?g("yes",a=>a.burned[Y-Y0]):null,Y>=Y0?g("no",a=>a.burned[Y-Y0]):null,(Y===2024||Y===NOW)?"*":""],
+  const parts=[[`${t("Burned")} ${Y}`,Y>=Y0?g("yes",a=>a.burned[Y-Y0]):null,Y>=Y0?g("no",a=>a.burned[Y-Y0]):null,(Y===2024||Y===NOW)?"*":""],
     [`${t("Hotspots")} ${Y}`,g("yes",a=>a.vytd[yi]),g("no",a=>a.vytd[yi]),""]];
   const W=Math.max(360,host.clientWidth-28),H=340,svg=frame(host,`${t("Inside or outside concessions")} · ${esc(scopeName())}`,
-    t("Share of the land, of the burned area of the year (KLHK) and of the VIIRS hotspots of the year (1 January to the last 2026 date) inside a 2025 business licence. Drag the year."),W,H);
-  const r=Math.min(64,W/8),cw=W/3,cy=86,arc=d3.arc().innerRadius(r*0.62).outerRadius(r);
+    t("Share of the burned area of the year (KLHK) and of the VIIRS hotspots of the year (1 January to the last 2026 date) inside a 2025 business licence. Drag the year."),W,H);
+  const r=Math.min(64,W/6),cw=W/2,cy=86,arc=d3.arc().innerRadius(r*0.62).outerRadius(r);
   parts.forEach(([lab,a,b,star],i)=>{
     const cx=cw*i+cw/2,gg=svg.append("g").attr("transform",`translate(${cx},${cy})`),tot=(a||0)+(b||0),p=tot>0?a/tot:null;
     gg.append("path").attr("d",arc({startAngle:0,endAngle:2*Math.PI})).attr("fill",css("--grid"));
     if(p!=null)tipOn(gg.append("path").attr("d",arc({startAngle:0,endAngle:2*Math.PI*p})).attr("fill",css("--s2")),`<b>${lab}</b><br>${t("Inside concessions")}: ${Math.round(100*p)}%`);
     T_(gg,0,0,p==null?"–":`${Math.round(100*p)}%${star}`,{anchor:"middle",size:20,weight:600});
     T_(svg,cx,cy+r+16,lab,{anchor:"middle",size:12.5,weight:600});
-    T_(svg,cx,cy+r+32,p==null?t("no burned-area map"):(i===2?`${f0(a)} ${t("of")} ${f0(tot)}`:`${f0(a/100)} ${t("of")} ${f0(tot/100)} km²`),{anchor:"middle",size:11,fill:css("--ink2")})});
+    T_(svg,cx,cy+r+32,p==null?t("no burned-area map"):(i===1?`${f0(a)} ${t("of")} ${f0(tot)}`:`${f0(a/100)} ${t("of")} ${f0(tot/100)} km²`),{anchor:"middle",size:11,fill:css("--ink2")})});
   // share inside concessions through the years: hotspots and burned area against the land share
   const x=d3.scaleLinear([V0,NOW],[44,W-60]),y=d3.scaleLinear([0,60],[H-14,250]);
-  const land=parts[0][2]+parts[0][1]>0?100*parts[0][1]/(parts[0][1]+parts[0][2]):0;
-  svg.append("line").attr("x1",x(V0)).attr("x2",x(NOW)).attr("y1",y(land)).attr("y2",y(land)).attr("stroke",css("--muted")).attr("stroke-dasharray","4 3");
-  T_(svg,x(NOW)+6,y(land),`${t("land")} ${Math.round(land)}%`,{size:10.5,fill:css("--ink2")});
   const hs=VY.map(v=>{const a=g("yes",z=>z.vytd[v-V0]),b=g("no",z=>z.vytd[v-V0]);return [v,a+b>0?100*a/(a+b):null]});
   const bs=YEARS.map(v=>{const a=g("yes",z=>z.burned[v-Y0]),b=g("no",z=>z.burned[v-Y0]);return [v,a+b>0?100*a/(a+b):null]});
   const ln=d3.line().defined(d=>d[1]!=null).x(d=>x(d[0])).y(d=>y(d[1]));
@@ -206,53 +197,56 @@ function donut(){
   $("#dplay").onclick=()=>{if(playing){clearInterval(playing);playing=null;donut();return}
     if(state.dy>=NOW)state.dy=V0;playing=setInterval(()=>{state.dy++;if(state.dy>=NOW){state.dy=NOW;clearInterval(playing);playing=null}donut()},700);donut()}}
 
-// each class's share of land against its share of fire, and hotspot density inside against the rest
-function fireLand(T){
-  const host=$("#v-land"),Y=yr();
-  const defs=[["Concessions",SPLITS.concession.of,"yes"],["Forest area",k=>C.forest_group[k],"kawasan"],["DMPG villages",SPLITS.dmpg.of,"yes"],["Peat",k=>C.peat[k]===1?"yes":"no","yes"]]
-    .filter(d=>!(state.basis==="peat"&&d[0]==="Peat"));
-  const rows=defs.map(([n,f,k])=>{const m=aggregate(f),a=m.get(k)||blank(),o=blank();for(const [kk,v] of m)if(kk!==k){o.area+=v.area;o.sel+=v.sel}
-    return {n,land:T.area?100*a.area/T.area:0,burn:sumPast(T)?100*sumPast(a)/sumPast(T):0,hs:T.sel?100*a.sel/T.sel:0,din:rate(a.sel,a.area),dout:rate(o.sel,o.area),area:a.area}})
-    .filter(r=>r.area>0).sort((a,b)=>(b.din/b.dout||0)-(a.din/a.dout||0));
-  const W=Math.max(420,host.clientWidth-28),rh=52,top=58,H=top+rows.length*rh+20;
-  const svg=frame(host,`${t("Fire against land")} · ${esc(scopeName())}`,t("Left: share of the area, of the burned area 2015 to 2025 and of the hotspots of the year. Right: hotspots per 100 km² inside the class and on the rest of the land."),W,H);
-  const L=112,xa=d3.scaleLinear([0,Math.max(70,d3.max(rows,r=>Math.max(r.land,r.burn,r.hs))+8)],[L,L+(W-L)*0.5]);
-  const xb=d3.scaleLinear([0,d3.max(rows,r=>Math.max(r.din||0,r.dout||0))*1.15||1],[xa.range()[1]+40,W-150]);
-  [[css("--muted"),"open",t("area")],[css("--s1"),"fill",t("burned area")],[css("--s2"),"fill",`${t("hotspots")} ${Y}`]].forEach(([c,k,l],i)=>{
-    const x0=L+i*110;svg.append("circle").attr("cx",x0+5).attr("cy",14).attr("r",5).attr("fill",k==="open"?css("--surface"):c).attr("stroke",c).attr("stroke-width",2);T_(svg,x0+14,14,l,{size:11,fill:css("--ink2")})});
-  [[css("--s2"),t("inside")],[css("--axis"),t("rest of the land")]].forEach(([c,l],i)=>{const x0=xb(0)+i*70;svg.append("rect").attr("x",x0).attr("y",9).attr("width",10).attr("height",10).attr("rx",2).attr("fill",c);T_(svg,x0+14,14,l,{size:11,fill:css("--ink2")})});
-  T_(svg,L,36,"%",{size:10.5,fill:css("--muted")});T_(svg,xb(0),36,t("per 100 km²"),{size:10.5,fill:css("--muted")});
-  rows.forEach((r,i)=>{
-    const y=top+i*rh+12;
-    T_(svg,L-12,y-6,t(r.n),{anchor:"end",size:12.5,weight:600});T_(svg,L-12,y+9,`${f0(r.area/100)} km²`,{anchor:"end",size:10.5,fill:css("--muted")});
-    const lo=Math.min(r.land,r.burn,r.hs),hi=Math.max(r.land,r.burn,r.hs);
-    svg.append("line").attr("x1",xa(lo)).attr("x2",xa(hi)).attr("y1",y).attr("y2",y).attr("stroke",css("--axis")).attr("stroke-width",2);
-    [[r.land,"open",css("--muted")],[r.burn,"fill",css("--s1")],[r.hs,"fill",css("--s2")]].forEach(([v,k,c])=>
-      tipOn(svg.append("circle").attr("cx",xa(v)).attr("cy",y).attr("r",6.5).attr("fill",k==="open"?css("--surface"):c).attr("stroke",k==="open"?c:css("--surface")).attr("stroke-width",2),
-        `<b>${t(r.n)}</b><br>${t("area")} ${f1(r.land)}% · ${t("burned area")} ${f1(r.burn)}% · ${t("hotspots")} ${f1(r.hs)}%`));
-    T_(svg,xa(r.land),y+17,`${Math.round(r.land)}%`,{anchor:"middle",size:10.5,fill:css("--muted")});
-    T_(svg,xa(hi)+11,y,`${Math.round(r.burn)}% · ${Math.round(r.hs)}%`,{size:11,fill:css("--ink2")});
-    [[r.din,css("--s2"),-9],[r.dout,css("--axis"),1]].forEach(([v,c,dy])=>{svg.append("rect").attr("x",xb(0)).attr("y",y+dy).attr("width",Math.max(0,xb(v||0)-xb(0))).attr("height",8).attr("rx",2).attr("fill",c);
-      T_(svg,xb(v||0)+4,y+dy+4,f0(v),{size:10.5,fill:css("--ink2")})});
-    const q=r.din&&r.dout?r.din/r.dout:null;T_(svg,W-4,y,q?`${f1(q)}× ${t("the rest")}`:"–",{anchor:"end",size:12,weight:600,fill:q>=2?css("--ink"):css("--ink2")})})}
+// DMPG village peat against other peat in the provinces that hold DMPG village peat, per year (VIIRS, same window every year)
+const DREF=META.dmpg_reference,DPROV=new Set(DREF.provinces),D1=META.dmpg_first_year;
+function dmpgPeat(){
+  const host=$("#v-land"),Ys=d3.range(PAST[0],NOW+1),nY=Ys.length;
+  const A={yes:{area:0,v:new Float64Array(nY)},no:{area:0,v:new Float64Array(nY)}};
+  const keep=k=>C.peat[k]===1&&DPROV.has(C.province[k])&&(state.scope==="all"||(state.scope==="in")===!!C.in_khg[k])&&(!state.island||C.island[k]===state.island)&&(!state.province||C.province[k]===state.province);
+  for(let i=0;i<AR.k.length;i++){const k=AR.k[i];if(keep(k))A[C.dmpg[k]?"yes":"no"].area+=AR.ha[i]}
+  for(let j=0;j<HT.k.length;j++){const k=HT.k[j],y=HT.y[j];if(HT.s[j]!==1||!HT.ytd[j]||y<PAST[0]||!keep(k)||(state.high&&!HT.hi[j])||(!state.stat&&HT.st[j]))continue;A[C.dmpg[k]?"yes":"no"].v[y-PAST[0]]+=HT.n[j]}
+  const S=["yes","no"].map(c=>Ys.map((y,i)=>rate(A[c].v[i],A[c].area)));
+  const W=Math.max(420,host.clientWidth-28),H=330,m={l:44,r:120,t:46,b:26};
+  const svg=frame(host,`${t("DMPG village peat and other peat")} · ${esc(scopeName())}`,
+    t("VIIRS hotspots per 100 km² of KLH peat in DMPG villages and on other peat of the provinces with DMPG villages, 1 January to the last 2026 date in every year. The gap was there before the first villages joined: the programme works on the most fire-prone peat."),W,H);
+  if(!(A.yes.area>0&&A.no.area>0)){T_(svg,m.l,H/2,t("No DMPG village peat in this selection."),{fill:css("--ink2")});return}
+  const x=d3.scaleLinear([PAST[0],NOW],[m.l+14,W-m.r]),y=d3.scaleLinear([0,(d3.max(S[0].concat(S[1]))||1)*1.12],[H-m.b,m.t]).nice(4);
+  if(D1&&D1>PAST[0]){svg.append("rect").attr("x",m.l).attr("y",m.t-6).attr("width",x(D1)-m.l).attr("height",H-m.b-m.t+6).attr("fill",css("--grid")).attr("opacity",0.55);
+    T_(svg,(m.l+x(D1))/2,m.t-14,t("Before DMPG"),{anchor:"middle",size:11,weight:600,fill:css("--ink2")});
+    svg.append("line").attr("x1",x(D1)).attr("x2",x(D1)).attr("y1",m.t-6).attr("y2",H-m.b).attr("stroke",css("--ink2")).attr("stroke-dasharray","3 3");
+    T_(svg,x(D1)+5,m.t-14,`${D1}: ${t("first DMPG villages")}`,{size:11,fill:css("--ink2")})}
+  y.ticks(4).forEach(v=>{svg.append("line").attr("x1",m.l).attr("x2",W-m.r).attr("y1",y(v)).attr("y2",y(v)).attr("stroke",css("--grid"));T_(svg,m.l-6,y(v),f0(v),{anchor:"end",size:10.5,fill:css("--muted")})});
+  Ys.forEach(v=>{if(v%2===1||v===NOW)T_(svg,x(v),H-m.b+14,v,{anchor:"middle",size:10.5,fill:css("--muted")})});
+  const ln=d3.line().defined(d=>d!=null).x((d,i)=>x(Ys[i])).y(d=>y(d)),cols=[css("--s5"),css("--s1")];
+  S.forEach((s,c)=>svg.append("path").attr("d",ln(s)).attr("fill","none").attr("stroke",cols[c]).attr("stroke-width",2).attr("stroke-linejoin","round"));
+  Ys.forEach((v,i)=>{const a=S[0][i],b=S[1][i];if(a==null||b==null)return;
+    S.forEach((s,c)=>tipOn(svg.append("circle").attr("cx",x(v)).attr("cy",y(s[i])).attr("r",b>=10?4:2.5).attr("fill",cols[c]).attr("stroke",css("--surface")).attr("stroke-width",1.5),
+      `<b>${v}</b><br>${t("DMPG village peat")}: ${f1(a)}<br>${t("Other peat")}: ${f1(b)} ${t("per 100 km²")}${b>0?`<br>${f1(a/b)}×`:""}`));
+    if(b>=10)T_(svg,x(v),y(a)-12,`${f1(a/b)}×`,{anchor:"middle",size:11.5,weight:600}).attr("stroke",css("--surface")).attr("stroke-width",3).attr("paint-order","stroke")});
+  const e=nY-1;
+  [[0,t("DMPG village peat"),A.yes.area],[1,t("Other peat"),A.no.area]].forEach(([c,l,ar])=>{const yy=y(S[c][e]??0)+(c===1&&Math.abs(y(S[0][e]??0)-y(S[1][e]??0))<30?16:0);
+    T_(svg,W-m.r+10,yy,l,{size:11.5,weight:600,fill:cols[c]});T_(svg,W-m.r+10,yy+14,`${f0(ar/100)} km²`,{size:10.5,fill:css("--muted")})});
+  // parity with the build (default filters only)
+  if(state.scope==="all"&&!state.island&&!state.province&&!state.high&&!state.stat){let bad=0,n=0;
+    for(const [yy,r] of Object.entries(DREF.rates)){const i=+yy-PAST[0];if(i<0||i>=nY)continue;n++;if(Math.abs(S[0][i]-r[0])>0.01||Math.abs(S[1][i]-r[1])>0.01)bad++}
+    document.body.dataset.dmpgParity=`${n}:${bad}`}}
 
 // forest area x concession as a Marimekko: width = land of the forest group, height = share in concessions, colour = density
 function mosaic(){
   const host=$("#v-mosaic"),Y=yr(),m=aggregate(k=>C.forest_group[k]+"|"+((C.lic_bits[k]&CONC)?"c":"n"));
   const G=[["kawasan",t("Forest area (kawasan hutan)")],["apl",t("Other land use (APL)")]].map(([g,l])=>{const c=m.get(g+"|c")||blank(),n=m.get(g+"|n")||blank();return {g,l,c,n,area:c.area+n.area}}).filter(d=>d.area>0);
-  const W=Math.max(380,host.clientWidth-28),H=300,svg=frame(host,`${t("Concession and forest area")} · ${esc(scopeName())}`,
-    t("Column width: area of the forest group. Height: share inside and outside concessions. Colour: hotspots per 100 km² in the selected year."),W,H);
-  const br=[10,20,40,80],col=d=>d==null?css("--grid"):SEQ[d3.bisectRight(br,d)];
+  const W=Math.max(380,host.clientWidth-28),H=262,svg=frame(host,`${t("Concession and forest area")} · ${esc(scopeName())}`,
+    t("Column width: area of the forest group. Height: share of it inside and outside concessions. Labels: area and hotspots of the selected year."),W,H);
+  const col=c=>c?css("--s2"):css("--s1");
   const x0=8,x1=W-8,y0=10,y1=H-50,tot=d3.sum(G,d=>d.area);let x=x0;
   G.forEach(d=>{const w=(x1-x0)*d.area/tot;let y=y0;
-    [[d.c,t("Concession")],[d.n,t("No concession")]].forEach(([a,lab])=>{const h=(y1-y0)*a.area/d.area,den=rate(a.sel,a.area),c=col(den);
+    [[d.c,t("Concession"),1],[d.n,t("No concession"),0]].forEach(([a,lab,isc])=>{const h=(y1-y0)*a.area/d.area,c=col(isc);
       if(h>0){tipOn(svg.append("rect").attr("x",x+1).attr("y",y+1).attr("width",Math.max(0,w-2)).attr("height",Math.max(0,h-2)).attr("rx",3).attr("fill",c),
-        `<b>${lab} · ${d.l}</b><br>${f1(den)} ${t("per 100 km²")}<br>${f0(a.area/100)} km² · ${f0(a.sel)} ${t("hotspots")} ${Y}`);
-        if(h>34&&w>90){T_(svg,x+8,y+14,lab,{size:12,weight:600,fill:ink(c)});T_(svg,x+8,y+30,`${f1(den)} ${t("per 100 km²")} · ${Math.round(100*a.area/d.area)}%`,{size:11,fill:ink(c)})}}
+        `<b>${lab} · ${d.l}</b><br>${f0(a.area/100)} km² · ${f0(a.sel)} ${t("hotspots")} ${Y}`);
+        if(h>34&&w>90){T_(svg,x+8,y+14,lab,{size:12,weight:600,fill:"#fff"});T_(svg,x+8,y+30,`${Math.round(100*a.area/d.area)}% · ${f0(a.sel)} ${t("hotspots")}`,{size:11,fill:"#fff"})}}
       y+=h});
     T_(svg,x+w/2,y1+14,d.l,{anchor:"middle",size:11.5,fill:css("--ink2")});T_(svg,x+w/2,y1+28,`${Math.round(100*d.area/tot)}% ${t("of the area")}`,{anchor:"middle",size:10.5,fill:css("--muted")});x+=w});
-  let lx=8;const ly=H-8;T_(svg,lx,ly,`${t("per 100 km²")}:`,{size:10.5,fill:css("--ink2")});lx+=72;
-  ["< 10","10–20","20–40","40–80","≥ 80"].forEach((l,i)=>{svg.append("rect").attr("x",lx).attr("y",ly-5).attr("width",10).attr("height",10).attr("rx",2).attr("fill",SEQ[i]);lx+=14;const tt=T_(svg,lx,ly,l,{size:10.5,fill:css("--ink2")});lx+=tt.node().getComputedTextLength()+10})}
+}
 
 // provinces x years: VIIRS hotspots per 100 km², 1 January to the last 2026 date
 function heat(){
@@ -276,10 +270,10 @@ function heat(){
 function timesBurned(){
   const host=$("#v-times");
   const pairs=[[SPLITS.concession.of,[["yes","Concession"],["no","No concession"]]],[k=>C.forest_group[k],[["kawasan","Forest area (kawasan hutan)"],["apl","Other land use (APL)"]]],
-    [SPLITS.dmpg.of,[["yes","DMPG village"],["no","Outside DMPG villages"]]],[k=>C.peat[k]===1?"yes":"no",[["yes","Peat"],["no","Not peat"]]]].filter(p=>!(state.basis==="peat"&&p[1][0][1]==="Peat"));
-  const rows=[];pairs.forEach(([f,cl],g)=>{const m=aggregate(f);cl.forEach(([k,l])=>{const a=m.get(k);if(a&&a.area>0)rows.push({l,a,g})})});
+    [SPLITS.dmpg.of,[["yes","DMPG village peat"],["no","Other peat, same provinces"]],k=>C.peat[k]===1&&DPROV.has(C.province[k])],[k=>C.peat[k]===1?"yes":"no",[["yes","Peat"],["no","Not peat"]]]].filter(p=>!(state.basis==="peat"&&p[1][0][1]==="Peat"));
+  const rows=[];pairs.forEach(([f,cl,ex],g)=>{const m=aggregate(f,ex);cl.forEach(([k,l])=>{const a=m.get(k);if(a&&a.area>0)rows.push({l,a,g})})});
   const W=Math.max(320,host.clientWidth-28),rh=24,top=34,H=top+rows.length*rh+pairs.length*6+10;
-  const svg=frame(host,`${t("Times burned")} · ${esc(scopeName())}`,t("Share of each class burned once, twice, three times or four or more times in the burn years 2015 to 2026 (KLHK). The 2024 and 2026 maps are incomplete, so these are lower bounds."),W,H);
+  const svg=frame(host,`${t("Times burned")} · ${esc(scopeName())}`,t("Share of each class burned once, twice, three times or four or more times in the burn years 2015 to 2026 (KLHK). DMPG rows: KLH peat in the provinces with DMPG villages. The 2024 and 2026 maps are incomplete, so these are lower bounds."),W,H);
   const L=170,mx=d3.max(rows,r=>r.a.area?100*r.a.ever/r.a.area:0)||1,x=d3.scaleLinear([0,mx*1.15],[L,W-50]),lab=[t("once"),t("twice"),t("3 times"),t("4 or more")];
   lab.forEach((l,i)=>{svg.append("rect").attr("x",L+i*72).attr("y",9).attr("width",10).attr("height",10).attr("rx",2).attr("fill",css(TIMES[i]));T_(svg,L+i*72+14,14,l,{size:10.5,fill:css("--ink2")})});
   rows.forEach((r,i)=>{const a=r.a,y=top+i*rh+r.g*6,v=[a.ever-a.twice,a.x2,a.x3,a.x4].map(z=>100*z/a.area);let x0=x(0);
@@ -335,7 +329,7 @@ function update(){
   const T=aggregate(()=>"all").get("all")||blank();
   kpis(T,aggregate(SPLITS.concession.of),aggregate(SPLITS.forest.of),aggregate(SPLITS.dmpg.of));
   const sp=SPLITS[state.split],cls=aggregate(sp.of),shown=sp.classes.filter(c=>cls.has(c[0])&&(cls.get(c[0]).area>0||cls.get(c[0]).sel>0));
-  donut();fireLand(T);mosaic();classTable(cls,shown);heat();charts(T);timesBurned();provinces();hash()}
+  donut();dmpgPeat();mosaic();classTable(cls,shown);heat();charts(T);timesBurned();provinces();hash()}
 
 readHash();applyStatic();
 $("#psearch").oninput=e=>{state.q=e.target.value;provinces()};

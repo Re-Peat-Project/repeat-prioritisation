@@ -37,25 +37,19 @@ import shapely.ops
 from pyproj import Transformer
 
 from repeat_prioritisation.national import profile as P  # noqa: E402
+from repeat_prioritisation.national.fire_common import CODE_TO_KWS, DMPG_LAYER, KWS_CLASS, LIC_VALUE, peat_path  # noqa: E402,F401
 from repeat_prioritisation.national import stage3 as S3  # noqa: E402
 
 log = logging.getLogger("prioritas.overlay")
 
-# forest area function (Fungsi code in the KWS layer) -> class
-KWS_CLASS = {
-    "cons": ["CA", "CAL", "SM", "SML", "TN", "TNL", "TWA", "TWAL", "TAHURA", "TB", "HSA (KSA)", "KSA/KPA", "KSAL/KPAL"],
-    "hl": ["HL"], "prod": ["HP", "HPT"], "hpk": ["HPK"], "apl": ["APL"], "other": ["TUBUH AIR", "DANAU", "Belum terdefinisi"],
-}
 KWS_ORDER = ["cons", "hl", "prod", "hpk", "apl", "other", "none"]
 KWS_LABEL = {"cons": "Conservation", "hl": "Protection forest", "prod": "Production forest", "hpk": "Convertible production",
              "apl": "Other land use", "other": "Water, undefined", "none": "Not mapped"}
 FEG_ORDER = ["lindung", "budidaya", "none"]
 FEG_LABEL = {"lindung": "Protected function", "budidaya": "Cultivation function", "none": "Not mapped"}
 LIC_ORDER = ["sawit", "pbph", "pphkm", "pphtr", "tambang"]
-LIC_VALUE = {"Perkebunan Kelapa Sawit": "sawit", "PBPH": "pbph", "PPHKM": "pphkm", "PPHTR": "pphtr", "Pertambangan": "tambang"}
 LIC_LABEL = {"sawit": "Oil palm", "pbph": "Forest concession (PBPH)", "pphkm": "Community forest (PPHKM)",
              "pphtr": "Plantation forest (PPHTR)", "tambang": "Mining"}
-CODE_TO_KWS = {c: k for k, cs in KWS_CLASS.items() for c in cs}
 
 RING_ORDER = ["lic", "ring", "out"]
 RING_LABEL = {"lic": "In a licence", "ring": "Within 5 km of a licence", "out": "Farther from licences"}
@@ -65,7 +59,6 @@ DEFAULT = {"overlay": {"top_actors": 8, "company_names": True, "max_licence_poly
                       "peat_function": "landstatus/FEG__Indonesia__2017__Rev_Tipologi.gpkg",
                       "licences": "landstatus/ALL_Updade__IZIN_USAHA__PBPH_Perkebunan_HTRKM_Tambang__2025.gpkg",
                       "dmpg": "dpg/dmpg_villages_sitmat.gpkg"}}         # DMPG villages, SiTMAT portal (repeat_common.fetch_sitmat_layers)
-DMPG_LAYER = "dmpg_villages"
 DMPG_COLS = ["PROVINSI", "KABUPATEN", "KECAMATAN", "DESA", "PROG_DMPG", "Skema_DPG"]
 DMPG_PROG_LABEL = {"Skema DMPG": "DMPG", "Skema DMPG dan DMPM": "DMPG and DMPM"}
 
@@ -76,11 +69,6 @@ def load_cfg(path):
         cfg["inputs"].setdefault(k, v)
     P._merge(cfg, {"overlay": dict(DEFAULT["overlay"], **cfg.get("overlay", {}))})
     return cfg
-
-
-def peat_path(cfg):
-    pe = (cfg.get("peat") or {}).get("extent") or (cfg.get("stage3") or {}).get("peat_extent")
-    return pe if pe and Path(pe).exists() else None
 
 
 def now_points(cfg, g):

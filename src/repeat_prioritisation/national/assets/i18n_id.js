@@ -459,5 +459,19 @@ const ID={
 "Not peat":"Bukan gambut",
 "inside":"di dalam",
 "land":"lahan",
-"of":"dari"
+"of":"dari",
+"Share of the selected year's hotspots (large figure) and of the burned area of 2015 to 2025 inside a business licence. A hotspot inside a licence is a spatial overlap, not responsibility.":"Porsi titik panas tahun terpilih (angka besar) dan area terbakar 2015 sampai 2025 di dalam izin usaha. Titik panas di dalam izin adalah tumpang tindih ruang, bukan tanggung jawab.",
+"Share inside DMPG village land. The villages were chosen on fire-prone peat: the chart DMPG village peat and other peat compares them with other peat over time.":"Porsi di dalam lahan desa DMPG. Desa-desa ini dipilih di gambut yang rawan terbakar: grafik Gambut desa DMPG dan gambut lainnya membandingkannya dengan gambut lain dari tahun ke tahun.",
+"Share of the burned area of the year (KLHK) and of the VIIRS hotspots of the year (1 January to the last 2026 date) inside a 2025 business licence. Drag the year.":"Porsi area terbakar tahun itu (KLHK) dan titik panas VIIRS tahun itu (1 Januari sampai tanggal terakhir 2026) di dalam izin usaha 2025. Geser tahunnya.",
+"DMPG village peat and other peat":"Gambut desa DMPG dan gambut lainnya",
+"VIIRS hotspots per 100 km² of KLH peat in DMPG villages and on other peat of the provinces with DMPG villages, 1 January to the last 2026 date in every year. The gap was there before the first villages joined: the programme works on the most fire-prone peat.":"Titik panas VIIRS per 100 km² gambut KLH di desa DMPG dan di gambut lain pada provinsi yang memiliki desa DMPG, 1 Januari sampai tanggal terakhir 2026 setiap tahun. Selisihnya sudah ada sebelum desa pertama bergabung: program bekerja di gambut yang paling rawan terbakar.",
+"No DMPG village peat in this selection.":"Tidak ada gambut desa DMPG dalam pilihan ini.",
+"Before DMPG":"Sebelum DMPG",
+"first DMPG villages":"desa DMPG pertama",
+"DMPG village peat":"Gambut desa DMPG",
+"Other peat":"Gambut lainnya",
+"Other peat, same provinces":"Gambut lain, prov. sama",
+"Column width: area of the forest group. Height: share of it inside and outside concessions. Labels: area and hotspots of the selected year.":"Lebar kolom: luas kelompok kawasan. Tinggi: porsinya di dalam dan di luar konsesi. Label: luas dan titik panas tahun terpilih.",
+"Area burned in two or more years of 2015 to 2026.":"Luas yang terbakar pada dua tahun atau lebih dalam 2015 sampai 2026.",
+"Share of each class burned once, twice, three times or four or more times in the burn years 2015 to 2026 (KLHK). DMPG rows: KLH peat in the provinces with DMPG villages. The 2024 and 2026 maps are incomplete, so these are lower bounds.":"Porsi tiap kelas yang terbakar sekali, dua kali, tiga kali atau empat kali atau lebih pada tahun kebakaran 2015 sampai 2026 (KLHK). Baris DMPG: gambut KLH di provinsi yang memiliki desa DMPG. Peta 2024 dan 2026 belum lengkap, jadi angka ini batas bawah."
 };

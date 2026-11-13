@@ -37,6 +37,7 @@ from rasterio.features import geometry_mask
 from rasterio.windows import Window
 
 from repeat_prioritisation.common import scoring as SC  # noqa: E402
+from repeat_prioritisation.national.fire_common import norm_name  # noqa: E402,F401
 
 log = logging.getLogger("prioritas.profile")
 
@@ -108,10 +109,6 @@ def _merge(base, upd):
         else:
             base[k] = v
     return base
-
-
-def norm_name(s):
-    return re.sub(r"\s+", " ", str(s).replace("’", "'")).strip().lower()
 
 
 def load_khg(cfg, only=None):
