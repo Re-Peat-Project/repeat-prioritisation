@@ -16,10 +16,22 @@
   </div>
   <div class="top-actions">
     <span class="seg" id="lang"></span>
+    <button type="button" id="export-btn" class="ghost" data-i18n="Export data">Export data</button>
     <button type="button" id="notes-btn" class="ghost" data-i18n="Notes">Notes</button>
     <button type="button" id="theme-btn" class="ghost" data-i18n="Theme">Theme</button>
   </div>
 </header>
+
+<section class="card final" id="final" aria-label="Final prioritisation">
+  <div class="card-h"><div><h2 data-i18n="Final prioritisation">Final prioritisation</h2><p class="hint" id="final-sub"></p></div></div>
+  <div class="final-top">
+    <div><h3 data-i18n="Urgency against complexity">Urgency against complexity</h3><div id="final-matrix"></div></div>
+    <div><h3 data-i18n="Types">Types</h3><div id="final-types"></div></div>
+    <div><h3 data-i18n="Validation and stability">Validation and stability</h3><div class="kpis one" id="final-kpis"></div></div>
+  </div>
+  <div class="final-ctl"><span id="final-ctl"></span><span class="hint" id="final-count"></span></div>
+  <div id="final-table" class="tablewrap"></div>
+</section>
 
 <section class="bar" id="filters" aria-label="Filters">
   <div class="ctl"><span class="lab" data-i18n="Presets">Presets</span><span id="presets" class="seg"></span></div>
@@ -61,6 +73,7 @@
   <div class="card-h"><div><h2 id="p-name">Profile</h2><div class="chips" id="p-chips"></div></div>
     <div class="pickrow"><label class="pick"><span data-i18n="KHG">KHG</span> <select id="p-pick"></select></label>
     <label class="pick"><span data-i18n="Compare with">Compare with</span> <select id="p-cmp"></select></label></div></div>
+  <div class="pfinal" id="p-final"></div>
   <div class="kpis" id="p-kpis"></div>
   <div class="map-tools" id="p-tools"></div>
   <div class="p-maps" id="p-maps">
@@ -80,7 +93,15 @@
   <h2 data-i18n="Notes">Notes</h2><ul id="notes-list"></ul>
 </div></dialog>
 
+<dialog id="export"><div class="dlg">
+  <button type="button" class="ghost close" id="export-close" data-i18n="Close">Close</button>
+  <h2 data-i18n="Export data">Export data</h2><p class="hint" id="export-note"></p>
+  <ul id="export-list" class="exportl"></ul>
+  <button type="button" id="export-all" class="wide" data-i18n="Download all">Download all</button>
+</div></dialog>
+
 <div id="tip" role="tooltip"></div>
+<!--CSVDATA-->
 <script>/*D3*/</script>
 <script>/*ML*/</script>
 <script>/*PMT*/</script>

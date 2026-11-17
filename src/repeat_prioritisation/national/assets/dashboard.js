@@ -355,7 +355,7 @@ function cmpVals(i,Q){
   return v.concat(sh)}
 function renderProfile(){
   const id=state.sel;if(!id)return;const i=K.id.indexOf(id),P=profData(id);
-  $("#p-name").textContent=K.name[i];
+  $("#p-name").textContent=K.name[i];profileFinal(i);if(FIN&&$("#final-table"))$$("#final-table tr[data-id]").forEach(r=>r.classList.toggle("sel",r.dataset.id===id));
   $("#p-chips").innerHTML=chip(K.prov[i])+chip(id)+(P?chip(P.info.kab):"")+(K.team[i]?chip(t("team "+K.team[i])):"")+(noCanals(i)?chip(t("no canals mapped")):"")+(P&&P.info.dmpg?chip(t("DMPG villages: {n}",{n:P.info.dmpg})):"");
   const r=R.rank[i],r0=R0.rank[i],d=r&&r0?r0-r:null;
   const info=P?P.info:null;
@@ -832,7 +832,7 @@ function applyStatic(){
 }
 function setLang(l){
   LANG=l==="id"?"id":"en";
-  applyStatic();buildControls();fillPick();buildNotes();buildZoomButtons();buildTable();staticTips();
+  applyStatic();buildControls();fillPick();buildNotes();buildZoomButtons();buildTable();staticTips();buildFinal();buildExport();
   mapLabels(nat);PS.forEach(S=>mapLabels(S.m));
   render();history.replaceState(null,"",hashState());
 }
@@ -864,7 +864,7 @@ function render(selOnly){
 }
 function init(){
   readHash();applyStatic();
-  buildControls();fillPick();buildNotes();buildMap();buildTable();staticTips();recompute();
+  buildControls();fillPick();buildNotes();buildMap();buildTable();staticTips();buildFinal();buildExport();recompute();
   // parity with the Python ranking at default weights and filters
   let bad=0,cmp=0;const def=compute(DEF);if(state.minPeat===META.min_peat&&!state.islands.size){for(const i of def.order.slice(0,150)){cmp++;if(def.rank[i]!==K.ref_rank[i])bad++}}
   document.body.dataset.parity=cmp+":"+bad;
@@ -879,5 +879,6 @@ function init(){
   let rt;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{nat&&nat.resize();PS.forEach(S=>S.m&&S.m.resize());render()},150)});
   document.body.dataset.ready="1";
 }
+/*FINAL*/
 init();
 })();

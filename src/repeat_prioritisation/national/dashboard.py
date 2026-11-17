@@ -8,6 +8,8 @@ Reads what `repeat-national-profile --mode operational` wrote, the Stage 3 table
 profile: the top N by the default weights plus the team's selected KHG, or every KHG with `--top all`. A profile shows what has been computed for
 its KHG: rain and deficit, land cover, land status and tenure exist only for the KHG that went through stage 3, and are left out for the others. The weights are applied in the browser, with the same
 scaling as common.scoring (5th to 95th percentile of the KHG that pass the filters), so moving a slider re-ranks live.
+The final prioritisation (`repeat-national-final`) is shown above the weights (matrix, types, validation, a sortable list) and in
+each profile; the "Export data" menu downloads the CSV and JSON files behind the page (EXPORTS), embedded gzip-compressed.
 Template, scripts and the English to Indonesian dictionary (i18n_id.js): national/assets/. D3 (ISC) and MapLibre GL JS (BSD) are vendored there. The basemap is OpenFreeMap (Positron style, OpenMapTiles data, OpenStreetMap contributors): it loads from the internet, the rest works offline.
 """
 from __future__ import annotations
@@ -328,8 +330,75 @@ def attach_monthly(base, profiles):
             profiles[k]["hm"] = [[int(r.year), int(r.month), int(r.medium), int(r.high)] for r in g.itertuples()]
 
 
-def assemble(data, profiles, out_path):
+EXPORTS = [   # (file under <out> or hub:<path>, description) offered by the "Export data" menu
+    ("final/final_khg.csv", "Final prioritisation per KHG: urgency, stake, complexity and feasibility scores, type, ranks, stability, flags and the indicators behind them."),
+    ("final/final_types.csv", "Summary per type: KHG, KHG in the 337, peat area, SKEG-damaged peat, KHG with low feasibility."),
+    ("final/final_gaps.csv", "Gap lists: PPEG priority KHG outside the 337, high-urgency KHG outside the 362, 337 KHG not scored or scored with little peat."),
+    ("final/final_meta.json", "The rule of the final prioritisation as run (indicators, weights, pool, tercile cuts) and the run date."),
+    ("final/final_validation.json", "Validation against 2026 burned peat and the weight-sensitivity test."),
+    ("operational/profile.csv", "National KHG profile: fire, hotspot and canal indicators, peat area, villages, SiTMAT, the fire-based ranking."),
+    ("operational/yearly.csv", "Per KHG and year: burned peat and hotspots on peat."),
+    ("ppeg/ppeg_khg.csv", "KLH PPEG integrated analysis summed per KHG: peat, SKEG damage, dome, thickness, FEG, canal-affected, actors, intervention class."),
+    ("tenure/tenure_area.csv", "Peat and burned peat per KHG by tenure class (licence, forest area, other land) and DMPG village land."),
+    ("tenure_complexity/tenure_complexity.csv", "Tenure complexity per KHG (rule v2): shares of each claim type on peat, contested land, licence holders, index."),
+    ("hub:sites/khg_klh_priority.csv", "KLH priorities per KHG: the 337 work list (team, areas by intervention class) and the 362 PPEG priority KHG."),
+    ("hub:sites/khg_availability.csv", "Data availability per KHG: peat-depth source, LiDAR and DeltaDTM cover, canals, BRGM blocks, SiTMAT stations, water balance, run class."),
+]
+
+
+def final_payload(base):
+    """Final prioritisation (`repeat-national-final`) as arrays for the dashboard; None when it has not been run."""
+    fd = Path(base) / "final"
+    if not (fd / "final_khg.csv").exists():
+        return None
+    f = pd.read_csv(fd / "final_khg.csv")
+    meta = json.loads((fd / "final_meta.json").read_text(encoding="utf-8"))
+    vs = json.loads((fd / "final_validation.json").read_text(encoding="utf-8"))
+    types = pd.read_csv(fd / "final_types.csv")
+    nz = lambda s, nd=4: [None if pd.isna(x) else round(float(x), nd) for x in s]
+    ni = lambda s: [None if pd.isna(x) else int(x) for x in s]
+    cols = {"id": f.khg_code.tolist(), "name": f.khg_name.str.replace(r"^KHG\s+", "", regex=True).str.replace(r"\s+", " ", regex=True).tolist(),
+            "prov": f.provinces.fillna("").tolist(), "type": [x if isinstance(x, str) else None for x in f["type"]],
+            "u": nz(f.urgency), "s": nz(f.stake), "c": nz(f.complexity), "f": nz(f.feasibility),
+            "ru": ni(f.rank_urgency), "ru337": ni(f.rank_urgency_337), "rt": ni(f.rank_in_type), "st": nz(f.type_stability, 3),
+            "lowf": [int(bool(x)) for x in f.flag_low_feasibility.fillna(False)], "k337": [int(bool(x)) for x in f.klh_337],
+            "small": [int(bool(t) and not bool(p)) for t, p in zip(f["type"].notna(), f.in_pool.fillna(False))],
+            "peat": nz(f.peat_km2, 1)}
+    rule = meta["rule"]
+    return {"f": cols, "idx": {k: i for i, k in enumerate(cols["id"])},
+            "meta": {"written": rule.get("written"), "cuts": meta["tercile_cuts"], "validation": vs["validation"], "sensitivity": vs["sensitivity"],
+                     "types": types.to_dict("records"), "run": meta.get("run")}}
+
+
+def export_payload(base, hub):
+    """The CSV and JSON files behind the dashboard, gzip + base64 for the export menu."""
+    import base64
+    import gzip
+    items, tags = [], []
+    for rel, desc in EXPORTS:
+        f = (Path(hub) / rel[4:]) if rel.startswith("hub:") else Path(base) / rel
+        if not f.exists():
+            continue
+        raw = f.read_bytes()
+        if f.suffix == ".csv":
+            d = pd.read_csv(f, nrows=0)
+            rows, ncol = raw.count(b"\n") - 1, len(d.columns)
+        else:
+            rows, ncol = 1, len(json.loads(raw))
+        n = len(items)
+        items.append({"file": f.name if not rel.startswith("final/") else "final_" + f.name.replace("final_", ""), "desc": desc, "rows": rows, "cols": ncol,
+                      "kb": round(len(raw) / 1024, 1), "src": f"{rel.replace('hub:', 're-peat/')} · {date.fromtimestamp(f.stat().st_mtime).isoformat()}"})
+        tags.append(f'<script type="application/octet-stream" id="csv-{n}">{base64.b64encode(gzip.compress(raw, 9)).decode()}</script>')
+    return items, "\n".join(tags)
+
+
+def assemble(data, profiles, out_path, cfg=None):
     tpl = (ASSETS / "dashboard.html").read_text(encoding="utf-8")
+    csv_tags = ""
+    if cfg is not None:
+        hub = Path(P.os.environ.get("REPEAT_HUB", WORKSPACE / "re-peat"))
+        data = {**data, "final": final_payload(cfg["out"])}
+        data["exports"], csv_tags = export_payload(cfg["out"], hub)
     safe = lambda obj: json.dumps(obj, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/")   # only the payload: "</script>" in it would end the tag
     prof_tags = "\n".join(f'<script type="application/json" id="prof-{k}">{safe(v)}</script>' for k, v in profiles.items())
     data = {**data, "style": json.loads((ASSETS / "basemap-positron.json").read_text(encoding="utf-8"))}   # OpenFreeMap Positron style
@@ -338,9 +407,10 @@ def assemble(data, profiles, out_path):
             .replace("/*PMT*/", (ASSETS / "pmtiles.v4.3.0.js").read_text(encoding="utf-8"))
             .replace("/*MLCSS*/", (ASSETS / "maplibre-gl.v5.24.0.css").read_text(encoding="utf-8"))
             .replace("/*CSS*/", (ASSETS / "dashboard.css").read_text(encoding="utf-8"))
-            .replace("/*JS*/", (ASSETS / "dashboard.js").read_text(encoding="utf-8").replace("/*I18N*/", (ASSETS / "i18n_id.js").read_text(encoding="utf-8")))
+            .replace("/*JS*/", (ASSETS / "dashboard.js").read_text(encoding="utf-8").replace("/*I18N*/", (ASSETS / "i18n_id.js").read_text(encoding="utf-8"))
+                     .replace("/*FINAL*/", (ASSETS / "final.js").read_text(encoding="utf-8")))
             .replace("/*DATA*/", "const DATA=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/") + ";")
-            .replace("<!--PROFILES-->", prof_tags))
+            .replace("<!--PROFILES-->", prof_tags).replace("<!--CSVDATA-->", csv_tags))
     Path(out_path).write_text(html, encoding="utf-8")
     print(f"{out_path}: {len(html) / 1e6:.1f} MB, {len(data['khg']['id'])} KHG, {len(profiles)} profiles")
 
@@ -365,7 +435,7 @@ def main(argv=None):
         data, profiles = build(cfg, a.top, out)
         cache.write_text(json.dumps({"data": data, "profiles": profiles}, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     attach_monthly(cfg["out"], profiles)
-    assemble(data, profiles, out)
+    assemble(data, profiles, out, cfg)
     from repeat_prioritisation.national import fire_page
     fire_page.build(cfg, Path(out).with_name("fire.html"))    # the second page, linked from the header
     if not a.reassemble and not a.no_tiles:

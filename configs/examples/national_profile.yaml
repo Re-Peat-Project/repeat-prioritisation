@@ -43,6 +43,32 @@ tenure_complexity:        # repeat-national-tenure-complexity; see the module do
     htr: tenure/htr.gpkg
     pptpkh: tenure/pptpkh.gpkg
     pelepasan: tenure/pelepasan.gpkg
+final:                    # repeat-national-final: four dimensions, typology, validation; rule written 2026-11-17 before any result
+  written: "2026-11-17"
+  min_peat_km2: 25        # scoring pool: KHG with at least this much KLH peat (as tenure_complexity)
+  score_all_337_with_peat: true   # amendment 2026-11-17 after the first run: the 337 below min_peat_km2 are scored against the pool (flagged)
+  dimensions:             # indicators: weight, direction (+ = more of it raises the score); score = weighted mean of percentile ranks
+    urgency:
+      u_fire_freq: {weight: 2}        # mean annual burned share of peat, 2015-2025
+      u_burn_repeat: {weight: 1}      # share burned twice or more
+      u_hotspot: {weight: 1}          # VIIRS hotspots per km2 of peat per year, 2012-2025
+      u_hotspot_now: {weight: 1}      # this year's hotspots per km2 of peat
+      damage_share: {weight: 1}       # SKEG 2024 damaged share of peat (PPEG priority area)
+      canal_share: {weight: 1}        # canal-affected share of peat (PPEG KET_KANAL)
+    stake:
+      thick3m_share: {weight: 1}      # peat 3 m or deeper
+      dome_share: {weight: 1}         # BBSDLP dome landform
+      protected_share: {weight: 1}    # protected peat ecosystem function
+      peat_km2: {weight: 1}           # peat area (carbon at stake)
+    complexity:
+      tenure_complexity: {weight: 2}  # tenure complexity v2
+      actor_types: {weight: 1}        # actor types holding priority area: company, company buffer, Ministry of Forestry, KLH
+      villages: {weight: 1}           # Bluebook target villages + DMPG villages
+    feasibility:
+      dry_balance_mm: {weight: 1}     # dry-season P - E (higher = less shortfall)
+      brgm_blocks_per_km2: {weight: 1}   # existing BRGM structures per km2 of peat
+  validation: {target: u_burned_now, exclude: [u_hotspot_now]}   # urgency without 2026 hotspots against the 2026 burned share of peat
+  sensitivity: {runs: 500, seed: 20261117}   # every weight times U(0.5, 1.5)
 fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
   crs: EPSG:6933          # equal-area grid, so every cell has the same area
   cell_m: 30

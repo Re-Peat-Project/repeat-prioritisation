@@ -35,6 +35,7 @@ repeat-national-monthly = "repeat_prioritisation.national.monthly:main"   # VIIR
 repeat-national-tenure-dome = "repeat_prioritisation.national.tenure_dome:main"   # the same by position on the peat dome (KHG with a licence-edge run)
 repeat-national-tenure-water = "repeat_prioritisation.national.tenure_water:main"   # model dry-season depth by land tenure (KHG with a model run)
 repeat-national-tenure-complexity = "repeat_prioritisation.national.tenure_complexity:main"   # overlapping claims on peat per KHG: licences, PPHKM, forest estate, DMPG; index
+repeat-national-final = "repeat_prioritisation.national.final:main"   # final national prioritisation: urgency, stake, complexity, feasibility, typology
 repeat-national-fire-page = "repeat_prioritisation.national.fire_page:main"   # the dashboard's fire-by-land-status page (fire.html)
 repeat-national-ppeg = "repeat_prioritisation.national.ppeg:main"   # per-KHG summary of the KLH PPEG integrated analysis (SKEG-damaged peat = priority area)
 repeat-national-fire = "repeat_prioritisation.national.fire_landstatus:main"   # burned area and hotspots by concession, forest area and DMPG, all of Indonesia (30 m equal-area tiles)
