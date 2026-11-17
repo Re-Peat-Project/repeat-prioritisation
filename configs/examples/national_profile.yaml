@@ -43,32 +43,58 @@ tenure_complexity:        # repeat-national-tenure-complexity; see the module do
     htr: tenure/htr.gpkg
     pptpkh: tenure/pptpkh.gpkg
     pelepasan: tenure/pelepasan.gpkg
-final:                    # repeat-national-final: four dimensions, typology, validation; rule written 2026-11-17 before any result
+final:                    # repeat-national-final: five dimensions, typology, validation. Rule v2 written 2026-11-17 before any v2 result
+  version: 2              # v1 (2026-11-17, four dimensions) kept in <out>/final_v1/ with its rule in final_v1/final_meta.json
   written: "2026-11-17"
   min_peat_km2: 25        # scoring pool: KHG with at least this much KLH peat (as tenure_complexity)
-  score_all_337_with_peat: true   # amendment 2026-11-17 after the first run: the 337 below min_peat_km2 are scored against the pool (flagged)
+  score_all_337_with_peat: true   # the 337 below min_peat_km2 are scored against the pool and flagged (v1 amendment, kept)
+  score_337_without_klh_peat: true   # amendment 2026-11-17, before any result for them: the 10 KHG of the 337 with no KLH peat are scored with the whole KHG as peat (repeat-national-final-whole-khg), against the pool, flagged whole_khg
   dimensions:             # indicators: weight, direction (+ = more of it raises the score); score = weighted mean of percentile ranks
-    urgency:
+    urgency:              # unchanged from v1
       u_fire_freq: {weight: 2}        # mean annual burned share of peat, 2015-2025
       u_burn_repeat: {weight: 1}      # share burned twice or more
       u_hotspot: {weight: 1}          # VIIRS hotspots per km2 of peat per year, 2012-2025
       u_hotspot_now: {weight: 1}      # this year's hotspots per km2 of peat
       damage_share: {weight: 1}       # SKEG 2024 damaged share of peat (PPEG priority area)
       canal_share: {weight: 1}        # canal-affected share of peat (PPEG KET_KANAL)
+      u_canal_primary: {weight: 0}    # canal length per km2 of KHG, primary canals (the earlier fire ranking's canal density). Weight 0 by default:
+      u_canal_secondary: {weight: 0}  #   added 2026-11-17 so users can turn canal density on in the dashboard; with weight 0 no result changes
+      u_canal_tertiary: {weight: 0}   #   (canal_share already measures drainage; giving both a weight counts canals twice)
     stake:
       thick3m_share: {weight: 1}      # peat 3 m or deeper
       dome_share: {weight: 1}         # BBSDLP dome landform
       protected_share: {weight: 1}    # protected peat ecosystem function
       peat_km2: {weight: 1}           # peat area (carbon at stake)
-    complexity:
+      conservation_share: {weight: 1} # new in v2: share of peat in conservation areas (national parks, reserves; Kawasan Hutan 2023)
+    complexity:           # unchanged from v1
       tenure_complexity: {weight: 2}  # tenure complexity v2
       actor_types: {weight: 1}        # actor types holding priority area: company, company buffer, Ministry of Forestry, KLH
       villages: {weight: 1}           # Bluebook target villages + DMPG villages
-    feasibility:
+    feasibility:          # v2: water and access replace BRGM block density (which echoed urgency; now reported only)
+      water_dist_km: {weight: 1, direction: "-"}   # median distance from the peat to a two-line river or a lake (RBI)
+      road_dist_km: {weight: 1, direction: "-"}    # median distance from the peat to a road (RBI detailed roads, footpaths excluded)
       dry_balance_mm: {weight: 1}     # dry-season P - E (higher = less shortfall)
-      brgm_blocks_per_km2: {weight: 1}   # existing BRGM structures per km2 of peat
+    people:               # new in v2: who is exposed to peat fire and haze, and who lives on the peat
+      pop_on_peat: {weight: 1}        # people living on the KHG's peat (IHME Populace 2025q3, 40 m)
+      pop_10km: {weight: 1}           # people within 10 km of the KHG (haze exposure proxy)
+      villages_peat: {weight: 1}      # 2023 villages with land on the KHG's peat
+  reported: [brgm_blocks_per_km2, peat_volume_mm3, tma_deep_share, open_share, forest_share]   # shown, not scored
+  intervention:           # written 2026-11-17 before any result: which intervention each scored KHG needs; independent of the type
+    rewetting: {indicator: canal_share, min: 0.20}   # at least 20% of the peat in KLH's canal-influence zones: drained, block the canals
+    revegetation: {indicator: open_share, min: 0.20} # at least 20% of the peat open or degraded in PL_2022 (shrub, open land, open swamp, savanna)
+    # label: "rewetting and revegetation" if both, "rewetting" or "revegetation" if one, "protect" if neither
+    # (peat still mostly forested and undrained). Absolute thresholds, not terciles, so the label means the same in every year.
+  flags: {low_feasibility: feasibility, high_exposure: people}       # lowest tercile of feasibility, highest of people; the type is not changed
   validation: {target: u_burned_now, exclude: [u_hotspot_now]}   # urgency without 2026 hotspots against the 2026 burned share of peat
   sensitivity: {runs: 500, seed: 20261117}   # every weight times U(0.5, 1.5)
+  inputs_layers:          # repeat-national-final-inputs
+    rivers: RBI_sungai.gpkg
+    lakes: RBI_wadukdanau.gpkg
+    roads: Transportasi_Jalan_Detil.gpkg
+    road_classes: [Jalan Tol, Jalan Arteri, Jalan Kolektor, Jalan Lokal, Jalan Lain]
+    population: population/populace/IDN_2025q3.tif   # amendment 2026-11-17: IHME Populace 2025q3, 40 m (was WorldPop 2020, 1 km)
+    villages: batas_desa_indonesia_2023_KLH.gpkg
+    exposure_buffer_km: 10
 fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
   crs: EPSG:6933          # equal-area grid, so every cell has the same area
   cell_m: 30

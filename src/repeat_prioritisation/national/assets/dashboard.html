@@ -12,27 +12,42 @@
   <div>
     <h1 data-i18n="Peat KHG priority">Peat KHG priority</h1>
     <p class="sub" id="sub"></p>
-    <nav class="nav"><a class="on" href="dashboard.html" data-i18n="KHG priority">KHG priority</a><a id="nav-fire" href="fire.html" data-i18n="Fire by land status">Fire by land status</a></nav>
+    <nav class="nav"><a class="on" href="dashboard.html" data-p="dashboard.html" data-i18n="KHG priority">KHG priority</a><a href="khg_table.html" data-p="khg_table.html" data-i18n="KHG table">KHG table</a><a id="nav-fire" href="fire.html" data-p="fire.html" data-i18n="Fire by land status">Fire by land status</a><a href="method.html" data-p="method.html" data-i18n="Method">Method</a></nav>
   </div>
   <div class="top-actions">
     <span class="seg" id="lang"></span>
     <button type="button" id="export-btn" class="ghost" data-i18n="Export data">Export data</button>
-    <button type="button" id="notes-btn" class="ghost" data-i18n="Notes">Notes</button>
     <button type="button" id="theme-btn" class="ghost" data-i18n="Theme">Theme</button>
   </div>
 </header>
 
-<section class="card final" id="final" aria-label="Final prioritisation">
-  <div class="card-h"><div><h2 data-i18n="Final prioritisation">Final prioritisation</h2><p class="hint" id="final-sub"></p></div></div>
+<section class="card final" id="final" aria-label="KHG priority">
+  <div class="card-h"><div><h2 data-i18n="KHG priority">KHG priority</h2><p class="hint" id="final-sub"></p></div>
+    <span class="seg" id="final-presets"></span></div>
   <div class="final-top">
-    <div><h3 data-i18n="Urgency against complexity">Urgency against complexity</h3><div id="final-matrix"></div></div>
-    <div><h3 data-i18n="Types">Types</h3><div id="final-types"></div></div>
-    <div><h3 data-i18n="Validation and stability">Validation and stability</h3><div class="kpis one" id="final-kpis"></div></div>
+    <div class="final-map">
+    <div class="card" id="mapcard">
+      <div class="card-h"><h2 data-i18n="Map">Map</h2><span class="seg" id="zoom-btns"></span></div>
+      <div class="map-tools" id="map-tools"></div>
+      <div id="map" role="img" aria-label="Map of KHG coloured by type"></div>
+      <div class="map-legend" id="map-legend"></div>
+    </div>
+    </div>
+    <div class="final-sum">
+      <div><h3 class="hasTip" id="h-types" data-i18n="Types">Types</h3><div id="final-types"></div></div>
+      <div class="final-val"><h3 class="hasTip" id="h-shift" data-i18n="Rank shift">Rank shift</h3><svg id="fshift" role="img" aria-label="Rank at the pre-registered weights against rank at your weights"></svg></div>
+    </div>
   </div>
-  <div class="final-ctl"><span id="final-ctl"></span><span class="hint" id="final-count"></span></div>
-  <div id="final-table" class="tablewrap"></div>
+  <div class="final-main">
+    <aside id="final-w" aria-label="Weights"></aside>
+    <div class="final-list">
+      <div class="final-ctl"><span id="final-ctl"></span><span class="hint" id="final-count"></span></div>
+      <div id="final-table" class="tablewrap"></div>
+    </div>
+  </div>
 </section>
 
+<div id="legacy" hidden>   <!-- the earlier fire-based ranking: kept as the engine of the profile charts, not shown -->
 <section class="bar" id="filters" aria-label="Filters">
   <div class="ctl"><span class="lab" data-i18n="Presets">Presets</span><span id="presets" class="seg"></span></div>
   <div class="ctl"><span class="lab" data-i18n="Min peat">Min peat</span><input type="range" id="minpeat" min="0" max="500" step="5"><output id="minpeat-o"></output></div>
@@ -56,18 +71,13 @@
   </section>
 
   <section class="side">
-    <div class="card" id="mapcard">
-      <div class="card-h"><h2 data-i18n="Map">Map</h2><span class="seg" id="zoom-btns"></span></div>
-      <div class="map-tools" id="map-tools"></div>
-      <div id="map" role="img" aria-label="Map of KHG coloured by score"></div>
-      <div class="map-legend" id="map-legend"></div>
-    </div>
     <div class="card" id="bumpcard">
       <div class="card-h"><h2 data-i18n="Rank shift">Rank shift</h2><span class="hint" id="bump-hint"></span></div>
       <svg id="bump" role="img" aria-label="Rank at default weights against rank at your weights"></svg>
     </div>
   </section>
 </main>
+</div>
 
 <section class="card profile" id="profile">
   <div class="card-h"><div><h2 id="p-name">Profile</h2><div class="chips" id="p-chips"></div></div>

@@ -310,7 +310,7 @@ function hideTip(){tipEl.style.display="none"}
   document.addEventListener("mouseout",e=>{const el=find(e);if(el&&!(e.relatedTarget&&el.contains(e.relatedTarget)))hideTip()})}
 function hash(){const th=document.documentElement.dataset.theme,s=state;
   const h=`#l=${LANG}${th?"&t="+th:""}&b=${s.basis}&sc=${s.scope}&src=${s.src}&y=${s.year}${s.high?"&c=h":""}${s.stat?"&st=1":""}&sp=${s.split}&dy=${s.dy}${s.island?"&i="+encodeURIComponent(s.island):""}${s.province?"&p="+encodeURIComponent(s.province):""}`;
-  history.replaceState(null,"",h);$("#nav-rank").href=`dashboard.html#l=${LANG}${th?"&t="+th:""}`}
+  history.replaceState(null,"",h);$$("nav.nav a[data-p]").forEach(a=>a.href=`${a.dataset.p}#l=${LANG}${th?"&t="+th:""}`)}
 function readHash(){const h=new URLSearchParams(location.hash.slice(1));
   LANG=h.get("l")==="id"||h.get("l")==="en"?h.get("l"):((navigator.language||"").toLowerCase().startsWith("id")?"id":"en");
   if(h.get("t")==="dark"||h.get("t")==="light")document.documentElement.dataset.theme=h.get("t");

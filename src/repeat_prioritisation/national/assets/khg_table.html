@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KHG table</title>
+<style>/*CSS*/</style>
+<style>
+.tp{max-width:1680px;margin:0 auto;padding:0 20px 24px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.tp>*{min-width:0}
+.tbar2{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end}
+.tbar2 .ctl{display:flex;flex-direction:column;gap:4px}
+.tbar2 .ctl>span{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.tbar2 input[type=search]{min-width:240px}
+.groups{display:flex;flex-wrap:wrap;gap:6px}
+.gchip{border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:12.5px;cursor:pointer;background:transparent;color:var(--ink2)}
+.gchip.on{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.rchips{display:flex;flex-wrap:wrap;gap:6px;min-height:0}
+.rchip{border:1px solid var(--border);border-radius:999px;padding:1px 4px 1px 10px;font-size:12px;background:var(--wash)}
+.rchip button{border:0;background:none;padding:0 4px;cursor:pointer;color:var(--muted)}
+.sumrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.sumrow .kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 12px}
+.sumrow .kpi .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.sumrow .kpi .l{font-size:12px;color:var(--muted)}
+.sumrow .kpi svg{display:block;width:100%;height:26px;margin-top:2px}
+.twrap{overflow:auto;max-height:calc(100vh - 120px);border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+table.kt{border-collapse:separate;border-spacing:0;font-size:12.5px;font-variant-numeric:tabular-nums}
+.kt thead th{position:sticky;top:0;z-index:3;background:var(--surface);vertical-align:bottom;text-align:left;font-weight:500;color:var(--ink2);padding:4px 6px 2px;border-bottom:1px solid var(--border);white-space:normal;min-width:92px;max-width:130px;line-height:1.2}
+.kt thead tr.g th{top:0;z-index:4;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:0;padding-top:6px;text-align:left;min-width:0;border-left:1px solid var(--grid)}
+.kt thead tr.h th{top:22px}
+.kt thead th .lb{cursor:pointer;display:block;min-height:2.4em}
+.kt thead th .lb.on{color:var(--ink);font-weight:650}
+.kt thead th svg.hist{display:block;width:100%;height:26px;margin-top:3px;cursor:crosshair}
+.kt td{padding:4px 6px;border-bottom:1px solid var(--grid);white-space:nowrap;text-align:right;position:relative}
+.kt td.l{text-align:left}
+.kt th.sticky,.kt td.sticky{position:sticky;left:0;z-index:2;background:var(--surface)}
+.kt thead th.sticky{z-index:5}
+.kt td.sticky{min-width:250px;max-width:300px;white-space:normal}
+.kt tbody tr:hover td{background:var(--wash)}
+.kt tbody tr{cursor:pointer}
+.kt td small{display:block;color:var(--muted);font-size:11px}
+.kt td .cb{position:absolute;left:6px;right:6px;bottom:2px;height:3px;border-radius:2px;background:var(--grid)}
+.kt td .cb i{display:block;height:100%;border-radius:2px;background:var(--c,var(--hist));opacity:.75}
+.kt td.na{color:var(--muted)}
+.kt td svg.spark{display:block;width:96px;height:22px}
+.kt .gstart{border-left:1px solid var(--grid)}
+.pager{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
+.pager .seg button{min-width:2.2em}
+.hbrush .selection{fill:var(--ink);fill-opacity:.12;stroke:var(--ink);stroke-opacity:.4}
+@media (max-width:1100px){.sumrow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div>
+    <h1 data-i18n="KHG table">KHG table</h1>
+    <p class="sub" id="sub"></p>
+    <nav class="nav"></nav>
+  </div>
+  <div class="top-actions">
+    <span class="seg" id="lang"></span>
+    <button type="button" id="csv-btn" class="ghost" data-i18n="Download CSV">Download CSV</button>
+    <button type="button" id="theme-btn" class="ghost" data-i18n="Theme">Theme</button>
+  </div>
+</header>
+<main class="tp">
+  <section class="card">
+    <div class="tbar2" id="tbar"></div>
+    <div class="rchips" id="rchips"></div>
+  </section>
+  <div class="sumrow" id="sum"></div>
+  <section class="card">
+    <div class="pager" id="pager-top"></div>
+    <div class="twrap" id="twrap"></div>
+    <div class="pager" id="pager"></div>
+  </section>
+  <p class="hint" id="foot"></p>
+</main>
+<div id="tip" role="tooltip"></div>
+<script>/*D3*/</script>
+<script>/*DATA*/</script>
+<script>/*JS*/</script>
+</body>
+</html>

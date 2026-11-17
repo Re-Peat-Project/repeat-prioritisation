@@ -104,9 +104,18 @@ def derive(df, targets):
     return out
 
 
-def load(path, targets):
-    df = pyogrio.read_dataframe(path, read_geometry=False, use_arrow=True, columns=COLS)
+def load(path, targets, whole_khg=None):
+    """Per-polygon areas. whole_khg: KHG names (normalised as derive() does) whose whole area counts as peat, for the KHG of
+    KLH's 337 that hold no peat in KLH's map (final prioritisation amendment 2026-11-17)."""
+    try:
+        import pyarrow  # noqa: F401
+        arrow = True
+    except ImportError:
+        arrow = False
+    df = pyogrio.read_dataframe(path, read_geometry=False, use_arrow=arrow, columns=COLS)
     d = derive(df, targets)
+    if whole_khg:
+        d["peat"] = d["peat"] | d["khg"].isin(set(whole_khg))
     peat, dmg, ha = d["peat"], d["damaged"], df["LUAS_HA"]
     f = pd.DataFrame({"khg": d["khg"], "area_ha": ha, "peat_ha": ha * peat})
     f["target_village_ha"] = ha * d["target_village"]

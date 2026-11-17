@@ -331,11 +331,13 @@ def attach_monthly(base, profiles):
 
 
 EXPORTS = [   # (file under <out> or hub:<path>, description) offered by the "Export data" menu
-    ("final/final_khg.csv", "Final prioritisation per KHG: urgency, stake, complexity and feasibility scores, type, ranks, stability, flags and the indicators behind them."),
+    ("final/final_khg.csv", "Final prioritisation per KHG: urgency, stake, complexity, feasibility and people scores, type, ranks, stability, flags and the indicators behind them."),
     ("final/final_types.csv", "Summary per type: KHG, KHG in the 337, peat area, SKEG-damaged peat, KHG with low feasibility."),
+    ("final/final_intervention.csv", "KHG, peat and SKEG-damaged peat by type and by the intervention the peat needs (rewetting, revegetation, both, protect)."),
     ("final/final_gaps.csv", "Gap lists: PPEG priority KHG outside the 337, high-urgency KHG outside the 362, 337 KHG not scored or scored with little peat."),
     ("final/final_meta.json", "The rule of the final prioritisation as run (indicators, weights, pool, tercile cuts) and the run date."),
     ("final/final_validation.json", "Validation against 2026 burned peat and the weight-sensitivity test."),
+    ("final_inputs/final_inputs.csv", "Inputs of the final prioritisation computed for it: distance to large rivers and lakes and to roads, conservation share of peat, population on the peat and within 10 km, villages on peat, peat volume."),
     ("operational/profile.csv", "National KHG profile: fire, hotspot and canal indicators, peat area, villages, SiTMAT, the fire-based ranking."),
     ("operational/yearly.csv", "Per KHG and year: burned peat and hotspots on peat."),
     ("ppeg/ppeg_khg.csv", "KLH PPEG integrated analysis summed per KHG: peat, SKEG damage, dome, thickness, FEG, canal-affected, actors, intervention class."),
@@ -362,14 +364,25 @@ def final_payload(base):
             "u": nz(f.urgency), "s": nz(f.stake), "c": nz(f.complexity), "f": nz(f.feasibility),
             "ru": ni(f.rank_urgency), "ru337": ni(f.rank_urgency_337), "rt": ni(f.rank_in_type), "st": nz(f.type_stability, 3),
             "lowf": [int(bool(x)) for x in f.flag_low_feasibility.fillna(False)], "k337": [int(bool(x)) for x in f.klh_337],
-            "small": [int(bool(t) and not bool(p)) for t, p in zip(f["type"].notna(), f.in_pool.fillna(False))],
-            "peat": nz(f.peat_km2, 1)}
+            "small": [int(bool(t) and not bool(p) and not bool(w)) for t, p, w in zip(f["type"].notna(), f.in_pool.fillna(False), f.get("whole_khg", pd.Series(False, index=f.index)).fillna(False))],
+            "wk": [int(bool(x)) for x in f.get("whole_khg", pd.Series(False, index=f.index)).fillna(False)],
+            "peat": nz(f.peat_km2, 1), "isl": f.island.fillna("").tolist(),
+            "pool": [int(bool(x)) for x in f.in_pool.fillna(False)],
+            "team": f.klh_337_team.fillna("").astype(str).tolist() if "klh_337_team" in f else [""] * len(f), "scored": [int(isinstance(x, str)) for x in f["type"]]}
+    if "intervention" in f:
+        cols["iv"] = [x if isinstance(x, str) else None for x in f.intervention]
+    if "people" in f:
+        cols["p"] = nz(f.people)
+        cols["hix"] = [int(bool(x)) for x in f.flag_high_exposure.fillna(False)]
     rule = meta["rule"]
-    inds = [k for spec in rule["dimensions"].values() for k in spec]
-    cols["ind"] = {k: nz(f[k], 5) for k in inds if k in f}
+    inds = [k for spec in rule["dimensions"].values() for k in spec] + [k for k in rule.get("reported", []) if k in f]
+    cols["ind"] = {k: nz(f[k], 10) for k in inds if k in f}   # full precision, so the page reproduces the scores exactly
     return {"f": cols, "idx": {k: i for i, k in enumerate(cols["id"])},
-            "meta": {"written": rule.get("written"), "cuts": meta["tercile_cuts"], "fcut": meta.get("feasibility_low_cut"),
-                     "dims": {d: {k: v["weight"] for k, v in spec.items()} for d, spec in rule["dimensions"].items()}, "validation": vs["validation"], "sensitivity": vs["sensitivity"],
+            "meta": {"written": rule.get("written"), "version": rule.get("version", 1), "cuts": meta["tercile_cuts"], "fcut": meta.get("feasibility_low_cut"),
+                     "pcut": meta.get("people_high_cut"), "intervention": meta["rule"].get("intervention"), "min_peat": rule.get("min_peat_km2"), "reported": rule.get("reported", []),
+                     "dims": {d: {k: v["weight"] for k, v in spec.items()} for d, spec in rule["dimensions"].items()},
+                     "dirs": {k: v.get("direction", "+") for spec in rule["dimensions"].values() for k, v in spec.items()},
+                     "validation": vs["validation"], "sensitivity": vs["sensitivity"],
                      "types": types.to_dict("records"), "run": meta.get("run")}}
 
 
@@ -411,7 +424,7 @@ def assemble(data, profiles, out_path, cfg=None):
             .replace("/*MLCSS*/", (ASSETS / "maplibre-gl.v5.24.0.css").read_text(encoding="utf-8"))
             .replace("/*CSS*/", (ASSETS / "dashboard.css").read_text(encoding="utf-8"))
             .replace("/*JS*/", (ASSETS / "dashboard.js").read_text(encoding="utf-8").replace("/*I18N*/", (ASSETS / "i18n_id.js").read_text(encoding="utf-8"))
-                     .replace("/*FINAL*/", (ASSETS / "final.js").read_text(encoding="utf-8")))
+                     .replace("/*FINAL*/", (ASSETS / "final.js").read_text(encoding="utf-8").replace("/*DEFS*/", (ASSETS / "defs.js").read_text(encoding="utf-8"))))
             .replace("/*DATA*/", "const DATA=" + json.dumps(data, separators=(",", ":"), ensure_ascii=False).replace("</", "<\\/") + ";")
             .replace("<!--PROFILES-->", prof_tags).replace("<!--CSVDATA-->", csv_tags))
     Path(out_path).write_text(html, encoding="utf-8")
@@ -439,8 +452,12 @@ def main(argv=None):
         cache.write_text(json.dumps({"data": data, "profiles": profiles}, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     attach_monthly(cfg["out"], profiles)
     assemble(data, profiles, out, cfg)
-    from repeat_prioritisation.national import fire_page
-    fire_page.build(cfg, Path(out).with_name("fire.html"))    # the second page, linked from the header
+    from repeat_prioritisation.national import fire_page, pages
+    pages.build(cfg["out"], data, profiles, Path(out).parent)   # the KHG table and the method page
+    try:
+        fire_page.build(cfg, Path(out).with_name("fire.html"))    # fire by land status, linked from the header
+    except ImportError as e:   # reads parquet: needs pyarrow
+        print(f"fire.html not rebuilt ({e}); build it with an environment that has pyarrow: python -m repeat_prioritisation.national.fire_page --config ...")
     if not a.reassemble and not a.no_tiles:
         tiles.run(cfg["out"])
 

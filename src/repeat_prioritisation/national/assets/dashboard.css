@@ -296,3 +296,107 @@ dialog#export{max-width:760px}
 .exportl li span{color:var(--ink2);font-size:13px}
 .exportl small{color:var(--muted)}
 .exportl .src{font-family:ui-monospace,Consolas,monospace;font-size:11px}
+
+/* merged KHG priority card: map and summary on top, weights and list below; dimension colours */
+:root{--dim-u:#d1495b;--dim-s:#2f8f6b;--dim-c:#7b3fa0;--dim-f:#3a7ca5;--dim-p:#c27c2c}
+:root[data-theme=dark]{--dim-u:#e8667a;--dim-s:#47b48a;--dim-c:#a97bd0;--dim-f:#5fa3cf;--dim-p:#e0a050}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--dim-u:#e8667a;--dim-s:#47b48a;--dim-c:#a97bd0;--dim-f:#5fa3cf;--dim-p:#e0a050}}
+.final .final-top{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px 24px}
+.final-sum{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:14px 22px;align-content:start}
+.final-sum .final-val{grid-column:1/-1}
+.final-val .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+.final-map #mapcard{border:0;padding:0;box-shadow:none;background:none;margin:0}
+.final-map #map{min-height:430px;height:430px;flex:none}
+.final-map .map-tools{flex-wrap:wrap}
+.final-main{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;margin-top:16px;align-items:start}
+#final-w{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow:auto;padding-right:4px}
+#final-w h2{font-size:15px;margin:0 0 4px}
+#final-w .fw-g{margin-bottom:4px}
+#final-w .sl{grid-template-columns:1fr 30px;margin:3px 0}
+#final-w .sl label{font-size:12.5px}
+#final-w .fw-rep{margin-top:10px;font-size:12px}
+.final-list{min-width:0}
+.final-list #final-table{max-height:720px}
+.final .card-h #final-presets{align-self:flex-start}
+.tyb.sm{font-size:10px;padding:0 4px;min-width:0;opacity:.85}
+.ftab td{padding:4px 6px}
+.ftab .fbar{width:64px}
+#p-strips h3{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:2px 0 4px;font-weight:600}
+@media (max-width:1200px){.final .final-top{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:900px){.final-main{grid-template-columns:minmax(0,1fr)}#final-w{position:static;max-height:none}}
+.ivb{display:inline-block;font-size:11px;line-height:1.5;padding:0 6px;border-radius:9px;background:color-mix(in srgb,var(--c) 22%,transparent);border:1px solid var(--c);color:var(--ink);white-space:nowrap}
+.ftypes.fiv{margin-top:10px}.ftypes.fiv th{font-weight:400}
+.ivn{border:0;background:none;padding:1px 6px;border-radius:6px;cursor:pointer;color:var(--ink);font:inherit}.ivn:hover:not([disabled]){background:var(--wash)}.ivn.on{background:color-mix(in srgb,var(--now) 20%,transparent)}.ivn[disabled]{color:var(--muted);cursor:default}
+.final-sum{grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr)}
+.final-sum #final-types{overflow-x:auto}
+.final-sum .ftypes{font-size:12.5px}
+.final-sum .ftypes th{white-space:normal;vertical-align:bottom;line-height:1.2}
+.final-sum .ftypes td{padding:3px 5px}
+
+/* profile bar per KHG (one segment per dimension), sort chips, confidence dot, team mark, rank shift */
+.pbar{display:flex;width:210px;height:12px;border-radius:3px;background:var(--grid);overflow:hidden;vertical-align:middle}
+.pbar b{display:block;height:100%;border-right:1px solid var(--surface)}
+.pbar b:last-child{border-right:0}
+.phead{white-space:nowrap}
+.pchip{display:inline-flex;align-items:center;gap:3px;margin-right:7px;cursor:pointer;font-weight:400;font-size:11.5px;color:var(--muted)}
+.pchip.on{color:var(--ink);font-weight:600}
+.pchip i{display:inline-block;width:9px;height:9px;border-radius:2px}
+.cdot{color:var(--muted)}.tdia{color:var(--ink2)}
+.ftab td.dl{color:var(--muted);font-size:12px}
+#fshift{width:100%;display:block}
+#fshift text{font-size:11px;fill:var(--ink2)}
+#fshift text.bh{fill:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}
+
+/* layout v3 (2026-11-17): map left, summary column right (types, type x intervention, rank shift); no matrix */
+.final .final-top{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px 26px;align-items:stretch}
+.final-map{display:flex;flex-direction:column;min-width:0}
+.final-map #mapcard{display:flex;flex-direction:column;flex:1;height:100%}
+.final-map #map{flex:1 1 auto;min-height:460px;height:auto}
+.final-sum{display:flex;flex-direction:column;gap:14px;min-width:0}
+.final-sum h3{margin:0 0 6px}
+.final-sum #final-types{overflow-x:visible}
+.final-sum .ftypes{width:100%;table-layout:auto;font-size:12.5px}
+.final-sum .ftypes.fiv{margin-top:12px}
+.final-sum .final-val{border-top:1px solid var(--grid);padding-top:10px}
+.final-main{grid-template-columns:250px minmax(0,1fr);margin-top:22px;border-top:1px solid var(--grid);padding-top:16px}
+.final-list #final-table{max-height:calc(100vh - 140px);min-height:560px}
+.ftab td{vertical-align:middle}
+#final-w .sl{grid-template-columns:minmax(0,1fr) 28px}
+#final-w .sl input{min-width:0;width:100%}
+#final-w .sl output{font-size:12px;color:var(--ink2);width:auto;min-width:0;justify-self:end}
+#final-w .sl{gap:0 6px}
+.ftab td small{display:inline;margin-left:6px}
+.pbar{width:100%;min-width:200px;max-width:460px;height:13px}
+@media (max-width:1200px){.final .final-top{grid-template-columns:minmax(0,1fr)}.final-map #map{min-height:420px}}
+.ftab td:nth-child(3){white-space:normal;min-width:250px;max-width:400px}
+.ftab td:nth-child(3) small{white-space:normal}
+.pbar{min-width:130px}
+.ftab{width:100%}
+.ftab th.phead{white-space:normal;line-height:1.5}
+.final .card-h{flex-wrap:wrap;gap:8px}
+#final-table{overflow-x:auto}
+#final-presets button,.final-map .map-tools button{white-space:nowrap}
+#map-legend{display:flex;flex-wrap:wrap;gap:2px 12px}
+
+/* profile layout (2026-11-17): indicators | land status, charts across the full width, licence holders | DMPG villages */
+.p-mid{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;gap:16px 28px}
+.p-mid .p-left,.p-mid #p-ov-panel{display:contents}
+.p-mid #p-strips{grid-column:1;grid-row:1/5;align-self:start}
+.p-mid #p-ov-panel>.ovhead{grid-column:2;grid-row:1}
+.p-mid #p-ov-panel>.ovgrid{grid-column:2;grid-row:2}
+.p-mid #p-ov-panel>.ov-tenure{grid-column:2;grid-row:3}
+.p-mid #p-charts{grid-column:1/-1;grid-row:5;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-flow:row dense;margin-top:6px;border-top:1px solid var(--grid);padding-top:14px}
+.p-mid #p-charts .ch.tall{grid-row:span 2}
+.p-mid #p-charts .ch.wide{grid-column:span 2}
+.p-mid #p-charts .ch.full{grid-column:1/-1}
+.p-mid #p-ov-panel>.ov-lic{grid-column:1;grid-row:6;border-top:1px solid var(--grid);padding-top:12px}
+.p-mid #p-ov-panel>.ov-vil{grid-column:2;grid-row:6;border-top:1px solid var(--grid);padding-top:12px}
+.p-mid #p-ov-panel>.ov-lic:last-child{grid-column:1/-1}
+.p-mid:has(#p-ov-panel:empty) #p-strips{grid-column:1/-1;grid-row:1}
+@media (max-width:1180px){.p-mid{grid-template-columns:minmax(0,1fr)}
+  .p-mid #p-strips,.p-mid #p-ov-panel>*,.p-mid #p-charts{grid-column:1/-1!important;grid-row:auto!important}
+  .p-mid #p-charts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.p-mid #p-charts{grid-template-columns:minmax(0,1fr)}.p-mid #p-charts .ch.wide{grid-column:auto}}
+.final-sum .ftypes{font-size:13.5px}
+.final-sum .ftypes td{padding:7px 6px}
+.final-sum .ftypes th{padding:4px 6px}
