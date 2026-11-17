@@ -32,6 +32,17 @@ indicators:
   u_hotspot_now: {weight: 1.0}   # this year's hotspots (KLH, Jan-Sep 2026), per km2 of peat; its own weight (0 drops it); standalone rank: peringkat_now
   u_burned_now: {weight: 0.0}    # this year's burned share of the peat: reported, not scored
   i_peat_depth: {weight: 0.0}   # peat map covers 89 of 865 KHG: reported, not scored
+tenure_complexity:        # repeat-national-tenure-complexity; see the module docstring for the rule and its history
+  version: 2              # v2 written 2026-11-16 after the v1 national result (kept in tenure_complexity_v1/) and before any v2 result
+  indicators: [c_licence_community, c_contested, c_claims_mean, c_holders]
+  weights: equal          # index = mean of the indicators' percentile ranks; provisional, agree with the team
+  min_peat_km2: 25        # smaller KHG get the indicators but no index
+  written: "2026-11-16"
+  layers:                 # python -m repeat_common.fetch_tenure_layers
+    hutan_desa: tenure/hutan_desa.gpkg
+    htr: tenure/htr.gpkg
+    pptpkh: tenure/pptpkh.gpkg
+    pelepasan: tenure/pelepasan.gpkg
 fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
   crs: EPSG:6933          # equal-area grid, so every cell has the same area
   cell_m: 30

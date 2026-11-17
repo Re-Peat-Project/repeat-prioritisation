@@ -7,8 +7,8 @@ Every point of a KHG (grid points for area, VIIRS hotspots for fire) gets one te
   licence      inside a business licence (oil palm, forest concession PBPH, plantation forest PPHTR, mining); sub = licence type
   forest       forest area (kawasan hutan) with no licence; sub = conservation, protection, production, convertible production
   other_land   everything else (other land use, water, not mapped)
-and a flag for DMPG village land (orthogonal: a DMPG village can hold land of any tenure class). Licence polygons overlap, so a
-point with several licence types takes the first of LIC_RANK. PPHKM (community forest permits) are not licences here: that land
+and a flag for DMPG village land (orthogonal: a DMPG village can hold land of any tenure class). Should licence polygons overlap
+(the 2025 file has none), a point with several licence types takes the first of LIC_RANK. PPHKM (community forest permits) are not licences here: that land
 stays in its forest area class.
 
 Areas are grid point counts times the cell area (same grid and peat sampling as `national.overlay`). Hotspots are VIIRS SNPP
