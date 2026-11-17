@@ -365,8 +365,11 @@ def final_payload(base):
             "small": [int(bool(t) and not bool(p)) for t, p in zip(f["type"].notna(), f.in_pool.fillna(False))],
             "peat": nz(f.peat_km2, 1)}
     rule = meta["rule"]
+    inds = [k for spec in rule["dimensions"].values() for k in spec]
+    cols["ind"] = {k: nz(f[k], 5) for k in inds if k in f}
     return {"f": cols, "idx": {k: i for i, k in enumerate(cols["id"])},
-            "meta": {"written": rule.get("written"), "cuts": meta["tercile_cuts"], "validation": vs["validation"], "sensitivity": vs["sensitivity"],
+            "meta": {"written": rule.get("written"), "cuts": meta["tercile_cuts"], "fcut": meta.get("feasibility_low_cut"),
+                     "dims": {d: {k: v["weight"] for k, v in spec.items()} for d, spec in rule["dimensions"].items()}, "validation": vs["validation"], "sensitivity": vs["sensitivity"],
                      "types": types.to_dict("records"), "run": meta.get("run")}}
 
 
