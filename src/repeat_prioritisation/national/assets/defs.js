@@ -1,10 +1,10 @@
 // Shared definitions of the prioritisation (types, dimensions, indicators, interventions), used by every page.
 // Needs t, fx, fmt in scope at call time.
 const TYPE_ORDER=["A","B","C","D","E"];
-const TYPE_LABEL={A:"Quick action",B:"Multi-party coordination",C:"Staged restoration",D:"Protect and monitor",E:"Monitor"};
+const TYPE_LABEL={A:"Quick action",B:"Multi-party coordination",C:"Medium urgency",D:"Protect and monitor",E:"Monitor"};
 const TYPE_NOTE={A:"High urgency, low or medium complexity: act now through KLH and the villages.",
   B:"High urgency, high complexity: needs coordination of companies, the Ministry of Forestry, KLH and villages.",
-  C:"Medium urgency: restore in stages.",D:"Low urgency, high stake (deep peat, dome, protected function, conservation areas): protect and monitor.",
+  C:"Medium urgency: act after the high-urgency KHG; the intervention label says what the peat needs.",D:"Low urgency, high stake (deep peat, dome, protected function, conservation areas): protect and monitor.",
   E:"Low urgency, low or medium stake: monitor."};
 const TYPE_RULE={A:"urgency high, complexity low or medium",B:"urgency high, complexity high",C:"urgency medium",D:"urgency low, stake high",E:"urgency low, stake low or medium"};
 const DIMS=[["u","Urgency","urgency"],["s","Stake","stake"],["c","Complexity","complexity"],["f","Feasibility","feasibility"],["p","People","people"]];

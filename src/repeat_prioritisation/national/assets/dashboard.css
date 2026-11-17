@@ -400,3 +400,5 @@ dialog#export{max-width:760px}
 .final-sum .ftypes{font-size:13.5px}
 .final-sum .ftypes td{padding:7px 6px}
 .final-sum .ftypes th{padding:4px 6px}
+
+#p-tools > .tg.muted{opacity:.35}

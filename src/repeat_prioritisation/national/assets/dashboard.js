@@ -542,7 +542,20 @@ const pLayers={peat:true,burn:true,p:true,s:true,t:true,now:true};
 const EMPTY={type:"FeatureCollection",features:[]};
 const pOv={mode:"off",vil:false,dmpg:false};
 const tilesUrl=id=>"pmtiles://khg_tiles/"+id+".pmtiles";                          // the map layers of one KHG: one archive per KHG, in khg_tiles/ next to this page
-const TILE_LAYERS=["p-peat","p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-lic-line","p-ov-ring","p-ov-vil","p-ov-vil-f","p-ov-dmpg","p-ov-dmpg-line"];
+const XL={      // layers behind the scores (repeat-national-extra-layers): [label, tip, classes [code, label, colour]]
+  depth:["Peat depth","Peat thickness classes (KLHK FEG, in KLH's PPEG analysis). Stake counts the share 3 m or deeper.",[[0,"< 1 m","#f1e3c8"],[1,"1-2 m","#dcb47a"],[2,"2-3 m","#b98142"],[3,"3-5 m","#8a5325"],[4,"5 m or more","#4f2a10"],[9,"No class","#d9d4c7"]]],
+  dome:["Peat dome","Peat dome landform (BBSDLP, in KLH's PPEG analysis). Stake counts the share of the peat on a dome.",[[1,"Peat dome","#1f4e79"]]],
+  skeg:["Damage (SKEG)","Peat damage status SKEG 2024 (KLH). Urgency counts the damaged share of the peat.",[[0,"Not damaged","#cfe3d4"],[1,"Light","#f2c57c"],[2,"Moderate","#e8863a"],[3,"Heavy","#c0392b"],[4,"Very heavy","#7b1c12"]]],
+  czone:["Canal zones","Canal-influence zones (KLH, PPEG KET_KANAL). Urgency counts the canal-affected share; 20% or more means rewetting.",[["p","Primary canal zone","#6fa8d6"],["s","Secondary canal zone","#a7cbe8"],["t","Tertiary canal zone","#d6e7f4"]]],
+  lc:["Land cover 2022","KLH land cover 2022 (PL_2022). Open or degraded cover of 20% or more means revegetation.",[["forest","Forest","#3f7d4e"],["open","Open or degraded","#e5c35c"],["plantation","Plantation","#a45ba0"],["farm","Farmland","#d99a6c"],["settlement","Settlement","#6d6d6d"],["water","Water","#8fb8d8"]]],
+  sf:["Social forestry","Social forestry (village forest, community plantation, IPHPS) and PPTPKH land: claims counted in tenure complexity.",[["hd","Village forest (HD)","#2a78d6"],["htr","Community plantation (HTR)","#5fa3cf"],["iphps","IPHPS","#93c1e6"],["pptpkh","PPTPKH","#c2307a"]]],
+  pop:["People","People per km2, IHME Populace 2025 third quarter (40 m grid). The people dimension counts the people on the peat and within 10 km.",[]]};
+const pX={mode:"off",river:false,road:false,brgm:false};
+let POPIDX=null;
+fetch("khg_tiles/pop/index.json").then(r=>r.ok?r.json():null).then(j=>{POPIDX=j;PS.forEach(S=>{if(S.m&&S.ready&&S.pending)setProfileData(S,S.pending)});if(state&&state.sel)drawMapLegendX()}).catch(()=>{});
+const xMatch=layer=>["match",["get","c"],...XL[layer][2].flatMap(([c,,col])=>[c,col]),"#999"];
+const X_LAYERS=["p-x-depth","p-x-dome","p-x-dome-line","p-x-skeg","p-x-czone","p-x-lc","p-x-sf","p-x-sf-line","p-x-pptpkh","p-x-lake","p-x-river","p-x-road","p-x-brgm"];
+const TILE_LAYERS=[...X_LAYERS,"p-peat","p-burn","p-outline","p-canal-t","p-canal-s","p-canal-p","p-ov-forest","p-ov-feg","p-ov-lic","p-ov-lic-line","p-ov-ring","p-ov-vil","p-ov-vil-f","p-ov-dmpg","p-ov-dmpg-line"];
 const pNow={a:1,b:12,high:false};                                                 // map-only filter on this year's hotspots: month range and confidence
 let nowLab=null;
 // hotspots shown on the map: month range and confidence (the page filter or the map toggle); medium points beyond the 9,000-point cap are not in the page, so the count is then a lower bound
@@ -601,10 +614,23 @@ function initProfileMap(S){
     vt("p-ov-vil-f","village","fill",{"fill-color":"#888","fill-opacity":.02},hid);vt("p-ov-dmpg","dmpg","fill",{"fill-color":"#888","fill-opacity":.3},hid);
     vt("p-ov-dmpg-line","dmpg","line",{"line-color":"#6250d6","line-width":1.2},hid);
     vt("p-ov-vil","village","line",{"line-color":"#6250d6","line-width":1.6,"line-dasharray":[3,2]},hid);
+    vt("p-x-depth","x_depth","fill",{"fill-color":xMatch("depth"),"fill-opacity":.85},hid);
+    vt("p-x-skeg","x_skeg","fill",{"fill-color":xMatch("skeg"),"fill-opacity":.85},hid);
+    vt("p-x-czone","x_czone","fill",{"fill-color":xMatch("czone"),"fill-opacity":.8},hid);
+    vt("p-x-lc","x_lc","fill",{"fill-color":xMatch("lc"),"fill-opacity":.8},hid);
+    vt("p-x-dome","x_dome","fill",{"fill-color":"#1f4e79","fill-opacity":.35},hid);vt("p-x-dome-line","x_dome","line",{"line-color":"#1f4e79","line-width":1.4},hid);
+    vt("p-x-sf","x_sf","fill",{"fill-color":xMatch("sf"),"fill-opacity":.45},hid);vt("p-x-sf-line","x_sf","line",{"line-color":xMatch("sf"),"line-width":1.2},hid);
+    vt("p-x-pptpkh","x_pptpkh","line",{"line-color":"#c2307a","line-width":1.6},hid);
+    m.addSource("pop",{type:"image",url:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",coordinates:[[0,1],[1,1],[1,0],[0,0]]});
+    m.addLayer({id:"p-x-pop",type:"raster",source:"pop",layout:{visibility:"none"},paint:{"raster-opacity":.85,"raster-resampling":"nearest"}},before);
     vt("p-burn","burn","fill",{"fill-color":"#555","fill-opacity":.9});
     vt("p-canal-t","canal_t","line",{"line-color":"#1baf7a","line-width":w(.3,1),"line-opacity":.55},{"line-join":"round"});
     vt("p-canal-s","canal_s","line",{"line-color":"#1baf7a","line-width":w(.6,1.8),"line-opacity":.85},{"line-join":"round"});
     vt("p-canal-p","canal_p","line",{"line-color":"#1baf7a","line-width":w(1,3)},{"line-join":"round"});
+    vt("p-x-lake","x_lake","fill",{"fill-color":"#8fb8d8","fill-opacity":.9},hid);
+    vt("p-x-river","x_river","line",{"line-color":"#2f6db3","line-width":w(1,3)},{visibility:"none","line-join":"round"});
+    vt("p-x-road","x_road","line",{"line-color":"#5c5a54","line-width":w(.5,2)},{visibility:"none","line-join":"round"});
+    vt("p-x-brgm","x_brgm","circle",{"circle-radius":w(1.4,4),"circle-color":"#d1495b","circle-stroke-color":"#fff","circle-stroke-width":.5},hid);
     vt("p-outline","outline","line",{"line-color":"#000","line-width":1.6});
     m.addLayer({id:"p-now-m",type:"circle",source:"p-now",filter:["==",["get","h"],0],paint:{"circle-radius":w(2,4.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
     m.addLayer({id:"p-now-h",type:"circle",source:"p-now",filter:["==",["get","h"],1],paint:{"circle-radius":w(3,6.5),"circle-color":"#eb6834","circle-stroke-color":"#fff","circle-stroke-width":.8}});
@@ -617,6 +643,9 @@ function initProfileMap(S){
     ovHover("p-ov-lic",p=>`<b>${esc(p.n||lab("licence",p.c))}</b><br><span>${lab("licence",p.c)}</span>`);
     ovHover("p-ov-vil-f",p=>`<b>${esc(p.n)}</b><br><span>${t("Target village")}</span>`);
     ovHover("p-ov-dmpg",p=>`<b>${esc(p.n)}</b><br><span>${esc(p.p)} · ${esc(p.s)}</span>`);
+    const xl=(layer,c)=>t((XL[layer][2].find(a=>String(a[0])===String(c))||[0,""])[1]);
+    for(const [id,layer] of [["p-x-depth","depth"],["p-x-skeg","skeg"],["p-x-czone","czone"],["p-x-lc","lc"],["p-x-sf","sf"]])ovHover(id,p=>`<b>${xl(layer,p.c)}</b><br><span>${t(XL[layer][0])}</span>`);
+    ovHover("p-x-dome",()=>`<b>${t("Peat dome")}</b>`);ovHover("p-x-brgm",p=>`<b>${t("BRGM structure")}</b>${p.j?"<br><span>"+esc(p.j)+"</span>":""}`);
     S.ready=true;pTheme(S);applyLayerToggles();
     if(S.pending!==undefined)setProfileData(S,S.pending);
   });
@@ -625,8 +654,13 @@ function applyLayerToggles(){
   for(const S of PS){
     const m=S.m;if(!m||!S.ready)continue;
     const vis=(ids,on)=>ids.forEach(id=>m.setLayoutProperty(id,"visibility",on?"visible":"none"));
-    vis(["p-sat"],pSat);vis(["p-peat"],pLayers.peat);vis(["p-burn"],pLayers.burn);vis(["p-canal-p"],pLayers.p);vis(["p-canal-s"],pLayers.s);vis(["p-canal-t"],pLayers.t);vis(["p-now-h"],pLayers.now);vis(["p-now-m"],pLayers.now&&!onlyHigh()&&!pNow.high);
+    const xOn=pX.mode!=="off";      // a layer behind the scores replaces the fire and canal layers while it is shown
+    vis(["p-sat"],pSat);vis(["p-peat"],pLayers.peat&&!xOn);vis(["p-burn"],pLayers.burn&&!xOn);vis(["p-canal-p"],pLayers.p&&!xOn);vis(["p-canal-s"],pLayers.s&&!xOn);vis(["p-canal-t"],pLayers.t&&!xOn);vis(["p-now-h"],pLayers.now&&!xOn);vis(["p-now-m"],pLayers.now&&!xOn&&!onlyHigh()&&!pNow.high);
+    $$("#p-tools > .tg").forEach(s=>s.classList.toggle("muted",xOn));
     {const f=nowFilter();m.setFilter("p-now-m",f.m);m.setFilter("p-now-h",f.h)}
+    vis(["p-x-depth"],pX.mode==="depth");vis(["p-x-dome","p-x-dome-line"],pX.mode==="dome");vis(["p-x-skeg"],pX.mode==="skeg");vis(["p-x-czone"],pX.mode==="czone");
+    vis(["p-x-lc"],pX.mode==="lc");vis(["p-x-sf","p-x-sf-line","p-x-pptpkh"],pX.mode==="sf");vis(["p-x-pop"],pX.mode==="pop"&&!!S.popOk);
+    vis(["p-x-river","p-x-lake"],pX.river);vis(["p-x-road"],pX.road);vis(["p-x-brgm"],pX.brgm);
     vis(["p-ov-forest"],pOv.mode==="forest");vis(["p-ov-feg"],pOv.mode==="feg");vis(["p-ov-lic","p-ov-lic-line"],pOv.mode==="licence");vis(["p-ov-ring"],pOv.mode==="ring");vis(["p-ov-vil","p-ov-vil-f"],pOv.vil);vis(["p-ov-dmpg","p-ov-dmpg-line"],pOv.dmpg);
   }
   setNowLab();
@@ -637,6 +671,7 @@ function setProfileData(S,P){const pmap=S.m;
   for(const id of TILE_LAYERS)pmap.setFilter(id,["==",["get","k"],k]);
   if(!P){pmap.getSource("p-now").setData(EMPTY);return}
   const L=P.lay;
+  {const c=POPIDX&&POPIDX.corners&&POPIDX.corners[k];S.popOk=!!c;if(c)pmap.getSource("pop").updateImage({url:`khg_tiles/pop/${k}.png`,coordinates:c});applyLayerToggles()}
   pmap.getSource("p-now").setData(fc(L.now.map(p=>({type:"Feature",properties:{m:p[2],h:p[3],p:p[4]},geometry:{type:"Point",coordinates:[p[0],p[1]]}}))));
   const b=L.bounds;pmap.fitBounds([[b[0],b[1]],[b[2],b[3]]],{padding:28,duration:0,maxZoom:14});
 }
@@ -682,6 +717,16 @@ function drawMap(P,P2){
     [[false,"Map","Street map, muted."],[true,"Satellite","Esri World Imagery. Resolution and date vary by place."]].forEach(([k,l,tp])=>{const b=document.createElement("button");b.type="button";b.textContent=t(l);b.dataset.tip=t(tp);b.className=pSat===k?"on":"";
       b.onclick=()=>{pSat=k;[...seg.children].forEach(x=>x.classList.toggle("on",x===b));applyLayerToggles()};seg.appendChild(b)});
     g.appendChild(seg)}
+  {const grp=document.createElement("span");grp.className="tgrp";tools.appendChild(grp);
+    const lb=document.createElement("span");lb.className="lab hasTip";lb.textContent=t("Data behind the scores");lb.dataset.tip=t("The layers the prioritisation is computed from, clipped to the KHG. One at a time; the legend is below the map. While one is shown, the fire and canal layers are hidden.");grp.appendChild(lb);
+    const seg=document.createElement("span");seg.className="seg";
+    [["off","Off","Hide these layers."],...Object.entries(XL).map(([k,v])=>[k,v[0],v[1]])].forEach(([k,l,tp])=>{const b=document.createElement("button");b.type="button";b.textContent=t(l);b.dataset.tip=t(tp);b.className=pX.mode===k?"on":"";
+      b.onclick=()=>{pX.mode=k;[...seg.children].forEach(x=>x.classList.toggle("on",x===b));applyLayerToggles();ovLegend(P)};seg.appendChild(b)});
+    grp.appendChild(seg);
+    for(const [k,l,ic,tp] of [["river","Rivers and lakes",`<i style="background:#2f6db3;height:3px"></i>`,"Large rivers (drawn with two banks in RBI) and lakes: water to fill the canals (feasibility)."],
+                              ["road","Roads",`<i style="background:#5c5a54;height:2px"></i>`,"RBI roads, footpaths excluded: access to build blocks (feasibility)."],
+                              ["brgm","BRGM structures",`<i class="dot" style="background:#d1495b"></i>`,"Canal blocks, wells and other BRGM structures. Reported, not scored."]]){
+      const s=document.createElement("span");s.className="tg"+(pX[k]?"":" off");s.innerHTML=ic+t(l);s.dataset.tip=t(tp);s.onclick=()=>{pX[k]=!pX[k];s.classList.toggle("off",!pX[k]);applyLayerToggles()};grp.appendChild(s)}}
   if(P.lay.ov){
     const grp=document.createElement("span");grp.className="tgrp";tools.appendChild(grp);const lb=document.createElement("span");lb.className="lab";lb.textContent=t("Land status");grp.appendChild(lb);
     const seg=document.createElement("span");seg.className="seg";
@@ -696,9 +741,17 @@ function drawMap(P,P2){
   ovLegend(P);
   $("#p-foot").innerHTML=t("Filled dot: on peat. Hollow: off peat. Large: high confidence.")+(P.lay.now_total>P.lay.now.length?" "+t("Showing {a} of {b} points.",{a:P.lay.now.length,b:P.lay.now_total}):"")+" "+t("Basemap needs internet.");
 }
+function drawMapLegendX(){const P=state.sel&&typeof getProfile==="function"?getProfile(state.sel):null;if(P)ovLegend(P)}
 function ovLegend(P){
-  const host=$("#p-ov-leg");host.innerHTML="";if(!P||!P.lay.ov)return;
+  const host=$("#p-ov-leg");host.innerHTML="";if(!P)return;
   const items=[];
+  if(pX.mode!=="off"){
+    if(pX.mode==="pop"){const pc=POPIDX||{classes:[1,10,100,1000,5000],colors:["#fde9c9","#f8c48a","#ee8f50","#cf5427","#8c2a0e"]};
+      items.push(`<span class="hint">${t("People per km2")}:</span>`);pc.classes.forEach((c,i)=>items.push(`<span><span class="sw" style="background:${pc.colors[i]}"></span>${i<pc.classes.length-1?fmt(c,0)+"–"+fmt(pc.classes[i+1],0):"≥ "+fmt(c,0)}</span>`));
+      if(!PS[0].popOk)items.push(`<span class="hint">${t("No population image for this KHG.")}</span>`)}
+    else XL[pX.mode][2].forEach(([c,l,col])=>items.push(`<span><span class="sw" style="background:${col}"></span>${t(l)}</span>`));
+    if(P.lay.ov&&pOv.mode!=="off")items.push(`<span class="hint">·</span>`)}
+  if(!P.lay.ov){host.innerHTML=items.join("");return}
   if(pOv.mode!=="off"){const layer=pOv.mode,present=new Set(P.lay.ov.oc[layer]||[]);OVCLS[layer].filter(([c])=>present.has(c)).forEach(([c,l])=>items.push(`<span><span class="sw" style="background:${ovColor(layer,c)}"></span>${t(l)}</span>`))}
   host.innerHTML=items.join("");
 }

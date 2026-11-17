@@ -38,6 +38,7 @@ repeat-national-tenure-complexity = "repeat_prioritisation.national.tenure_compl
 repeat-national-final = "repeat_prioritisation.national.final:main"   # final national prioritisation: urgency, stake, complexity, feasibility, typology
 repeat-national-final-inputs = "repeat_prioritisation.national.final_inputs:main"
 repeat-national-final-whole-khg = "repeat_prioritisation.national.final_whole_khg:main"
+repeat-national-extra-layers = "repeat_prioritisation.national.extra_layers:main"
 repeat-national-fire-page = "repeat_prioritisation.national.fire_page:main"   # the dashboard's fire-by-land-status page (fire.html)
 repeat-national-ppeg = "repeat_prioritisation.national.ppeg:main"   # per-KHG summary of the KLH PPEG integrated analysis (SKEG-damaged peat = priority area)
 repeat-national-fire = "repeat_prioritisation.national.fire_landstatus:main"   # burned area and hotspots by concession, forest area and DMPG, all of Indonesia (30 m equal-area tiles)

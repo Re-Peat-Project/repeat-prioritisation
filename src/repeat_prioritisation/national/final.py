@@ -16,7 +16,7 @@ Rule v2 (written 2026-11-17, before any v2 result; v1 kept in <out>/final_v1/):
 and a type from urgency, complexity and stake (terciles of the pool):
   A  quick action                 urgency high, complexity low or medium
   B  multi-party coordination     urgency high, complexity high
-  C  staged restoration           urgency medium
+  C  medium urgency               urgency medium (named 'staged restoration' until 2026-11-17; renamed, rule unchanged)
   D  protect and monitor          urgency low, stake high
   E  monitor                      urgency low, stake low or medium
 Amendment 2026-11-17, after the first run and before any use: 99 of KLH's 337 have less than 25 km2 of KLH peat (median 9.7 km2;
@@ -63,7 +63,7 @@ from repeat_prioritisation.national import land as L
 
 log = logging.getLogger("prioritas.final")
 TYPES = {"A": ("Aksi cepat", "Quick action"), "B": ("Koordinasi multipihak", "Multi-party coordination"),
-         "C": ("Pemulihan bertahap", "Staged restoration"), "D": ("Lindungi dan pantau", "Protect and monitor"),
+         "C": ("Urgensi sedang", "Medium urgency"), "D": ("Lindungi dan pantau", "Protect and monitor"),
          "E": ("Pantau", "Monitor")}
 
 

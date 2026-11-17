@@ -4,7 +4,8 @@
   repeat-national-tiles --config configs/examples/national_profile.yaml [--khg KHG.16.02.01 ...] [--workers 4] [--force] [--combined]
 
 `repeat-national-dashboard` writes one GeoJSON-lines file per layer to <out>/tiles/src/ (burn, peat, outline, canal_p, canal_s,
-canal_t, forest, feg, licence, ring, village, dmpg); every feature carries `k`, the khg_id. This command splits them by KHG and
+canal_t, forest, feg, licence, ring, village, dmpg) and repeat-national-extra-layers adds x_* (depth, dome, SKEG, canal zones,
+land cover, social forestry, PPTPKH, rivers, lakes, roads, BRGM); every feature carries `k`, the khg_id. This command splits them by KHG and
 turns each KHG into <out>/khg_tiles/<khg_id>.pmtiles with tippecanoe (pinned in tiles/Dockerfile; build the image once with
 `docker build -t repeat-tippecanoe:2.79.0 repeat-prioritisation/tiles`). One file per KHG keeps every file far below the 100 MB
 limit of GitHub and lets the page load only the KHG on screen. A KHG is skipped when its archive is newer than the sources
@@ -38,7 +39,8 @@ def write_sources(src, feats):
     src = Path(src)
     src.mkdir(parents=True, exist_ok=True)
     for f in src.glob("*.geojsonl"):
-        f.unlink()
+        if not f.name.startswith("x_"):           # x_*: the layers behind the scores, written by repeat-national-extra-layers
+            f.unlink()
     for layer, rows in feats.items():
         (src / f"{layer}.geojsonl").write_text("\n".join(json.dumps(r, separators=(",", ":")) for r in rows) + "\n", encoding="utf-8")
 
