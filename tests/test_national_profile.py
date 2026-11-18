@@ -60,8 +60,41 @@ def test_current_year_term():
     assert top["u_hotspot_now"].is_monotonic_decreasing                  # the standalone rank follows density
 
 
+def _units_and_points(tmp):
+    """Two units and hotspot files whose points all fall outside them (a KHG with no detection)."""
+    import geopandas as gpd
+    from shapely.geometry import Point, box
+    units = gpd.GeoDataFrame({"khg_id": ["U1", "U2"]}, geometry=[box(100, 0, 100.1, 0.1), box(100.1, 0, 100.2, 0.1)], crs=4326)
+    far = [Point(110, -2), Point(110.01, -2)]
+    viirs = gpd.GeoDataFrame({"year": [2019, 2020], "confidence": ["n", "h"], "type": [0, 0], "frp": [5.0, 7.0]},
+                             geometry=far, crs=4326)
+    now = gpd.GeoDataFrame({"month": [3, 7], "level": ["medium", "high"], "frp": [np.nan, 4.0],
+                            "acq_date": ["2026-03-02", "2026-07-15"]}, geometry=far, crs=4326)
+    viirs.to_file(f"{tmp}/viirs.gpkg")
+    now.to_file(f"{tmp}/now.gpkg", layer="hotspots")
+    return units
+
+
+def test_hotspots_none_inside():
+    """No detection in any unit: an empty table with the usual columns (not an error), and the profile's own
+    reindex/fillna then gives every unit 0."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        units = _units_and_points(tmp)
+        hs = P.hotspots_by_year(f"{tmp}/viirs.gpkg", units, {"types": [0], "confidence": ["n", "h"]})
+        now, meta = P.hotspots_now(f"{tmp}/now.gpkg", units, {"levels": ["medium", "high"]})
+    assert hs.empty and {"khg_id", "year", *P.HS_YEAR_COLS} <= set(hs.columns)
+    assert now.empty and {"khg_id", "month", *P.HS_NOW_COLS} <= set(now.columns)
+    assert meta["n_points"] == 2 and meta["n_inside"] == 0 and meta["last_date"] == "2026-07-15"
+    hy = hs.pivot(index="khg_id", columns="year", values="n_hotspot").reindex(units.khg_id).fillna(0)
+    assert (hy.sum(axis=1) == 0).all()                                    # as build_profile computes u_hotspot
+    tot = now.groupby("khg_id")[P.HS_NOW_COLS].sum().reindex(units.khg_id).fillna(0)
+    assert (tot["n_kept"] == 0).all() and len(tot) == 2                   # as build_profile computes u_hotspot_now
+
+
 if __name__ == "__main__":
     test_rank()
     test_operational_extends_years()
     test_current_year_term()
+    test_hotspots_none_inside()
     print("ok")
