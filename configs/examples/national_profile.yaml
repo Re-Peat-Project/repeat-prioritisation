@@ -60,6 +60,9 @@ final:                    # repeat-national-final: five dimensions, typology, va
       u_canal_primary: {weight: 0}    # canal length per km2 of KHG, primary canals (the earlier fire ranking's canal density). Weight 0 by default:
       u_canal_secondary: {weight: 0}  #   added 2026-11-17 so users can turn canal density on in the dashboard; with weight 0 no result changes
       u_canal_tertiary: {weight: 0}   #   (canal_share already measures drainage; giving both a weight counts canals twice)
+      forest_loss_2015: {weight: 0}   # amendment 2026-11-18 (before any result): share of the peat forest (undisturbed or degraded) in JRC TMF Dec 2014 and
+                                      #   deforested in Dec 2024. Weight 0 until the KLH workshop agrees weights (user, 2026-11-18)
+      sm_root_dry: {weight: 0, direction: "-"}   # amendment 2026-11-18: SMAP L4 root-zone soil moisture, mean of Jul-Oct 2025 over the peat; drier = more urgent; weight 0 as above
     stake:
       thick3m_share: {weight: 1}      # peat 3 m or deeper
       dome_share: {weight: 1}         # BBSDLP dome landform
@@ -78,10 +81,14 @@ final:                    # repeat-national-final: five dimensions, typology, va
       pop_on_peat: {weight: 1}        # people living on the KHG's peat (IHME Populace 2025q3, 40 m)
       pop_10km: {weight: 1}           # people within 10 km of the KHG (haze exposure proxy)
       villages_peat: {weight: 1}      # 2023 villages with land on the KHG's peat
-  reported: [brgm_blocks_per_km2, peat_volume_mm3, tma_deep_share, open_share, forest_share]   # shown, not scored
+  reported: [brgm_blocks_per_km2, peat_volume_mm3, tma_deep_share, open_share, forest_share,   # shown, not scored
+             reveg_share, burn_recovered_share, burn_unrecovered_share, tmf_forest_2024, tmf_degraded_2024, tmf_deforested_2024, tmf_regrowth_2024,
+             hansen_loss_2015, ndvi_dry, ndmi_dry, ndvi_low_share, sm_root_anom]   # amendment 2026-11-18 (before any result): repeat-national-final-cover and -final-gee
   intervention:           # written 2026-11-17 before any result: which intervention each scored KHG needs; independent of the type
     rewetting: {indicator: canal_share, min: 0.20}   # at least 20% of the peat in KLH's canal-influence zones: drained, block the canals
-    revegetation: {indicator: open_share, min: 0.20} # at least 20% of the peat open or degraded in PL_2022 (shrub, open land, open swamp, savanna)
+    revegetation: {indicator: reveg_share, min: 0.20} # amendment 2026-11-18, before any result (was open_share): at least 20% of the peat needs replanting,
+    # cell by cell on the TMF 30 m grid: open or degraded in PL_2022, OR burned 2015-2023 (KLHK) and not forest or regrowth in TMF Dec 2024, OR
+    # deforested since 2015 (TMF); plantations and crops in PL_2022 (Perkebunan, Hutan Tanaman, Pertanian*, Sawah) and settlements never count
     # label: "rewetting and revegetation" if both, "rewetting" or "revegetation" if one, "protect" if neither
     # (peat still mostly forested and undrained). Absolute thresholds, not terciles, so the label means the same in every year.
   flags: {low_feasibility: feasibility, high_exposure: people}       # lowest tercile of feasibility, highest of people; the type is not changed
@@ -95,6 +102,14 @@ final:                    # repeat-national-final: five dimensions, typology, va
     population: population/populace/IDN_2025q3.tif   # amendment 2026-11-17: IHME Populace 2025q3, 40 m (was WorldPop 2020, 1 km)
     villages: batas_desa_indonesia_2023_KLH.gpkg
     exposure_buffer_km: 10
+  cover:                  # amendment 2026-11-18: repeat-national-final-cover (local, 30 m TMF grid) and repeat-national-final-gee (Earth Engine)
+    tmf: forest/tmf_v1_2024        # per-KHG GeoTIFF, bands Dec2014, Dec2024 of projects/JRC/TMF/v1_2024/AnnualChanges (repeat_common.fetch_tmf_khg)
+    burned_years: [2015, 2023]     # burn scars old enough to have regrown by Dec 2024
+    ee_project: ee-danylaksono
+    dry_months: [7, 10]            # July to October
+    dry_year: 2025
+    baseline_years: [2016, 2024]   # SMAP anomaly baseline
+    ndvi_low: 0.5                  # NDVI below this in the dry season: open or degraded cover now
 fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
   crs: EPSG:6933          # equal-area grid, so every cell has the same area
   cell_m: 30

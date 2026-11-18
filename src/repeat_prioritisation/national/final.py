@@ -105,7 +105,9 @@ def d_rest(d, cfg, hub, tc, av):
     d["villages"] = d["n_desa_target"].fillna(0) + d["n_dmpg"].fillna(0)
     a = av.set_index("code")
     a.index = "KHG." + a.index.astype(str)        # khg_availability codes carry no "KHG." prefix
-    d["dry_balance_mm"] = d.khg_code.map(a["dry_shortfall_mm"])
+    # rain minus ET over the driest window (rule: P - E, higher = better). Fix 2026-11-18: until then the column held the
+    # shortfall itself (ET - rain, khg_availability's dry_shortfall_mm), so the sign was reversed in feasibility (v1, v2)
+    d["dry_balance_mm"] = -d.khg_code.map(a["dry_shortfall_mm"])
     d["brgm_blocks_per_km2"] = d.khg_code.map(a["blocks_brgm"]) / d["peat_km2"].replace(0, np.nan)
     d["run_class"] = d.khg_code.map(a["run_class"])
     fi = out / "final_inputs" / "final_inputs.csv"
@@ -114,6 +116,12 @@ def d_rest(d, cfg, hub, tc, av):
         keep = ["water_dist_km", "road_dist_km", "conservation_share", "villages_peat", "pop_on_peat", "pop_10km", "peat_volume_mm3", "depth_known_share",
                 "open_share", "forest_share", "lc_known_share"]
         d = d.merge(x[["khg_code"] + [k for k in keep if k in x]], on="khg_code", how="left")
+    for name in ("cover.csv", "gee.csv"):        # amendment 2026-11-18: forest change, burn recovery (final_cover), Earth Engine (final_gee)
+        f = out / "final_inputs" / name
+        if f.exists():
+            x = pd.read_csv(f)
+            x = x[[c for c in x.columns if c == "khg_code" or (c not in d.columns and c not in ("cover_cells", "cover_note"))]]
+            d = d.merge(x, on="khg_code", how="left")
     return d
 
 

@@ -33,9 +33,9 @@ for(const d of DIMS){const key=d[2];if(!R.dims[key])continue;
 const GROUPS=[["khg","KHG"],["scores","Scores"]];
 for(const [dim,spec] of Object.entries(M.dims)){const lab=(DIMS.find(d=>d[2]===dim)||[0,dim])[1];GROUPS.push([dim,lab]);
   for(const k of Object.keys(spec)){if(!R.ind[k])continue;const m=indMeta(k);
-    col({k,g:dim,label:m[0],tip:`${m[1]}<br><span>${t("Weight {w}",{w:fmt(spec[k],1)})}${M.dirs[k]==="-"?" · "+t("Lower values raise the score."):""}</span>`,v:j=>R.ind[k][j],f:m[2],num:true,color:`var(--dim-${DIMKEY[dim]})`})}}
+    col({k,g:dim,label:m[0],tip:`${m[1]}<br><span>${t("Weight {w}",{w:fmt(spec[k],1)})}${M.dirs[k]==="-"?" · "+t("Lower values raise the score."):""}</span>${fieldSrc(k)[0]?"<br><span>"+t("Source")+": "+t(fieldSrc(k)[0])+"</span>":""}`,v:j=>R.ind[k][j],f:m[2],num:true,color:`var(--dim-${DIMKEY[dim]})`})}}
 GROUPS.push(["reported","Reported, not scored"]);
-for(const k of [...M.reported,...M.extra]){if(!R.ind[k]||COLS.some(c=>c.k===k))continue;const m=indMeta(k);col({k,g:"reported",label:m[0],tip:m[1],v:j=>R.ind[k][j],f:m[2],num:true})}
+for(const k of [...M.reported,...M.extra]){if(!R.ind[k]||COLS.some(c=>c.k===k))continue;const m=indMeta(k);col({k,g:"reported",label:m[0],tip:m[1]+(fieldSrc(k)[0]?"<br><span>"+t("Source")+": "+t(fieldSrc(k)[0])+"</span>":""),v:j=>R.ind[k][j],f:m[2],num:true})}
 GROUPS.push(["trend","Trends"]);
 col({k:"sp_burn",g:"trend",label:"Burned peat, 2015 to 2026",tip:"Share of the KHG's peat burned each year (KLHK burnt area). 2026 to date. Sorts by the 2015 to 2025 mean.",
   v:j=>{const s=R.burned[j].slice(0,-1).filter(x=>x!=null);return s.length?d3.mean(s):null},spark:j=>R.burned[j],sc:"--hist",num:true,f:v=>fx(v,2)+"%"});
