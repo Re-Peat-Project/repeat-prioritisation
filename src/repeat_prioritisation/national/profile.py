@@ -247,6 +247,17 @@ def burned_by_year(path, khg, years, sampler=None):
     return yearly, freq
 
 
+HS_YEAR_COLS = ["n_all", "n_hotspot", "n_high", "frp_sum", "n_hotspot_peat", "frp_sum_peat"]
+HS_NOW_COLS = ["n_kept", "n_kept_peat", "n_high_peat", "n_frp_peat", "frp_sum_peat"]
+
+
+def _empty_counts(khg, period, cols):
+    """The table hotspots_by_year / hotspots_now return when no point falls in any unit: no rows, the same columns. The
+    grouping below fails on an empty join, and build_profile already fills the units without a row with 0."""
+    return pd.DataFrame({"khg_id": pd.Series(dtype=khg["khg_id"].dtype), period: pd.Series(dtype="int64"),
+                         **{c: pd.Series(dtype="float64") for c in cols}})
+
+
 def hotspots_by_year(path, khg, hcfg, sampler=None):
     """Per KHG and year: detections kept (type, confidence filter), FRP sum, high-confidence count, all vegetation-fire
     detections. Point-in-polygon on the WGS84 boundary."""
@@ -254,6 +265,9 @@ def hotspots_by_year(path, khg, hcfg, sampler=None):
     log.info("hotspots read: %d points", len(pts))
     pts = pts[pts["type"].isin(hcfg["types"])]
     j = gpd.sjoin(pts, khg[["khg_id", "geometry"]], how="inner", predicate="within")
+    if j.empty:   # no detection in any unit: counted as zero by build_profile, not as missing
+        log.warning("hotspots: no detection inside the %d unit(s); the hotspot rates are 0", len(khg))
+        return _empty_counts(khg, "year", HS_YEAR_COLS)
     j["conf"] = j["confidence"].astype(str).str.lower()
     j["keep"] = j["conf"].isin([c.lower() for c in hcfg["confidence"]])
     j["peat"] = False
@@ -283,7 +297,14 @@ def hotspots_now(path, khg, ncfg, sampler=None):
     high-confidence on peat, and FRP where the month has it (4 of 9 months do, so FRP is never summed across months)."""
     pts = pyogrio.read_dataframe(path, layer="hotspots", columns=["month", "level", "frp", "acq_date"])
     pts["keep"] = pts["level"].isin(ncfg["levels"])
+    last = pd.to_datetime(pts["acq_date"], errors="coerce").max()
     j = gpd.sjoin(pts, khg[["khg_id", "geometry"]], how="inner", predicate="within")
+    meta = {"last_date": None if pd.isna(last) else str(last.date()), "n_points": int(len(pts)),
+            "n_kept": int(pts["keep"].sum()), "months": sorted(pts["month"].unique().tolist()), "n_inside": int(len(j))}
+    if j.empty:   # no detection this year in any unit: zero up to last_date, not missing
+        log.warning("current-year hotspots: no detection inside the %d unit(s) up to %s; u_hotspot_now is 0",
+                    len(khg), meta["last_date"])
+        return _empty_counts(khg, "month", HS_NOW_COLS), meta
     j["peat"] = False
     if sampler is not None:
         geoms = khg.set_index("khg_id").geometry
@@ -299,9 +320,7 @@ def hotspots_now(path, khg, ncfg, sampler=None):
     out = pd.DataFrame({"n_kept": g["keep"].sum(), "n_kept_peat": g["kp"].sum(), "n_high_peat": g["hp"].sum(),
                         "n_frp_peat": g.apply(lambda d: (d["kp"] & d["has_frp"]).sum(), include_groups=False),
                         "frp_sum_peat": g.apply(lambda d: d.loc[d["kp"] & d["has_frp"], "frp"].sum(), include_groups=False)}).reset_index()
-    last = pd.to_datetime(pts["acq_date"], errors="coerce").max()
-    return out, {"last_date": None if pd.isna(last) else str(last.date()), "n_points": int(len(pts)),
-                 "n_kept": int(pts["keep"].sum()), "months": sorted(pts["month"].unique().tolist())}
+    return out, meta
 
 
 CANAL_CLASS = {"1": "primary", "2": "secondary", "3": "tertiary"}   # KODE_KANAL: Kanal Primer, Sekunder, Tersier
