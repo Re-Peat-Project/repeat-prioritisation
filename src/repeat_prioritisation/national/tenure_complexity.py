@@ -75,7 +75,8 @@ def _counts(pts, layer, key=None):
     return n, j
 
 
-def one(cfg, kid, name, g):
+def one(cfg, kid, name, g, points=False):
+    """points=True also returns the peat points with their claims (for worked examples)."""
     data, inp = Path(cfg["data"]), cfg["inputs"]
     g, lon, lat, pts, _, area_cell, cell = O.base_points(cfg, g)
     pts = pts[pts["peat"]].reset_index(drop=True)
@@ -141,6 +142,11 @@ def one(cfg, kid, name, g):
         "share_3plus_claims": float(np.mean(claims >= 3)),
     })
     cc = {int(k): int(v) * area_cell for k, v in zip(*np.unique(claims, return_counts=True))}
+    if points:
+        p = pd.DataFrame({"lon": pts.geometry.x, "lat": pts.geometry.y, "licence": has_lic, "community": community, "forest": in_forest,
+                          "dmpg": in_dmpg, "pptpkh": occupied, "released": released, "claims": claims, "contested": contested,
+                          "licence_community": has_lic & (community | in_dmpg)})
+        return out, cc, p, {"cell_m": cell, "holders": sorted(holders)}
     return out, cc
 
 

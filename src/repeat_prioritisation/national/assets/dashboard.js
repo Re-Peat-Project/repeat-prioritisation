@@ -782,7 +782,7 @@ function tenureHtml(P){
 }
 function renderOv(P){
   const host=$("#p-ov-panel");host.innerHTML="";if(!P||!P.ov)return;
-  const S=P.ov.s,fo=S.forest||[],tot=[d3.sum(fo,r=>r[2]),d3.sum(fo,r=>r[3]),d3.sum(fo,r=>r[4])];
+  const S=Object.assign({_whole:!!P.ov.whole},P.ov.s),fo=S.forest||[],tot=[d3.sum(fo,r=>r[2]),d3.sum(fo,r=>r[3]),d3.sum(fo,r=>r[4])];
   const val=(layer,c)=>{const r=(S[layer]||[]).find(x=>x[0]===c);return r?[r[2],r[3],r[4]]:[0,0,0]};
   const mkRows=(layer,codes)=>codes.map(c=>({c,l:(OVCLS[layer].find(a=>a[0]===c)||[0,c])[1],v:val(layer,c)}));
   const groups=[];
@@ -800,7 +800,7 @@ function renderOv(P){
     groups.push({layer:"dmpg_forest",title:"Kawasan hutan in DMPG villages",tip:"Forest area function of the land inside DMPG villages only: how much of the KHG's peat, burned peat and hotspots lies in village land that is also forest area. Bars are shares of the whole KHG, so they fill only as far as the villages reach.",rows:mkRows("dmpg_forest",OVCLS.forest.map(a=>a[0]))}) }
   const rowLab=[["Peat area","Peat area in each class, from KLH's peat land map."],["Burned peat","Peat that burned at least once in 2015 to 2025 (burnt-area polygons)."],["Hotspots this year","MODIS hotspots on peat this year, medium and high confidence."]];
   const totTxt=[fmt(tot[0],0)+" km2",fmt(tot[1],0)+" km2",fmt(tot[2],0)];
-  let html=`<div class="ovhead"><h3 class="hasTip"${tipAttr(t("Where the peat, the burned peat and this year's hotspots fall on each land-status layer. A segment wider in the lower bars than in the top bar means fire is over-represented in that class."))}>${t("Land status of the peat")}</h3></div><div class="ovgrid">`;
+  let html=`<div class="ovhead"><h3 class="hasTip"${tipAttr(t("Where the peat, the burned peat and this year's hotspots fall on each land-status layer. A segment wider in the lower bars than in the top bar means fire is over-represented in that class."))}>${t("Land status of the peat")}</h3>${S._whole?`<span class="hint">${t("No peat in KLH's peat map: the whole KHG is counted as peat, as in the ranking.")}</span>`:""}</div><div class="ovgrid">`;
   groups.forEach(g=>{
     const rows=g.rows.filter(r=>(r.v[0]>=.002*tot[0]||r.v[1]>0||r.v[2]>0)&&r.v[0]+r.v[1]+r.v[2]>0);if(!rows.length)return;
     const bars=ovSeg(g.layer,rows,tot);

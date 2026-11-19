@@ -116,7 +116,7 @@ def d_rest(d, cfg, hub, tc, av):
         keep = ["water_dist_km", "road_dist_km", "conservation_share", "villages_peat", "pop_on_peat", "pop_10km", "peat_volume_mm3", "depth_known_share",
                 "open_share", "forest_share", "lc_known_share"]
         d = d.merge(x[["khg_code"] + [k for k in keep if k in x]], on="khg_code", how="left")
-    for name in ("cover.csv", "gee.csv"):        # amendment 2026-11-18: forest change, burn recovery (final_cover), Earth Engine (final_gee)
+    for name in ("cover.csv", "gee.csv", "burned_s2.csv"):   # amendment 2026-11-18: forest change, burn recovery (final_cover), Earth Engine (final_gee), Sentinel-2 burned area (final_burned)
         f = out / "final_inputs" / name
         if f.exists():
             x = pd.read_csv(f)

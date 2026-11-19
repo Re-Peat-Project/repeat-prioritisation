@@ -251,8 +251,9 @@ def land_rows(pts, hs, area_cell, khg_km2, peat_total, kws, feg, dpg):
     return rows, pcs, p_in, h_in, vil
 
 
-def base_points(cfg, g):
-    """Grid points of one KHG with their peat and burned (2015-2025) flags, this year's hotspots inside it, the cell area and size."""
+def base_points(cfg, g, whole=False):
+    """Grid points of one KHG with their peat and burned (2015-2025) flags, this year's hotspots inside it, the cell area and size.
+    whole: the KHG has no KLH peat and is scored on its whole area (final rule), so every point counts as peat."""
     inp, data = cfg["inputs"], Path(cfg["data"])
     g = shapely.make_valid(g)
     lon, lat, area_cell, cell = grid(g)
@@ -261,6 +262,8 @@ def base_points(cfg, g):
     if pe:
         ps = P.PeatSampler(pe)
         pts["peat"] = ps.sample(ps.window(g), lon, lat) == 1
+    if whole:
+        pts["peat"] = True
     ycols = [f"BA_{y}" for y in range(2015, 2026)]
     b = _read(data / inp["burned"], g, ycols)
     if len(b):
@@ -269,7 +272,7 @@ def base_points(cfg, g):
             hit = gpd.sjoin(pts[["geometry"]], b[["geometry"]], how="inner", predicate="within")
             pts.loc[hit.index.unique(), "burned"] = True
     xs, ys, mon, hi, onp = now_points(cfg, g)
-    hs = gpd.GeoDataFrame({"onp": np.asarray(onp, bool), "high": np.asarray(hi, bool)}, geometry=gpd.points_from_xy(xs, ys), crs=4326)
+    hs = gpd.GeoDataFrame({"onp": np.ones(len(xs), bool) if whole else np.asarray(onp, bool), "high": np.asarray(hi, bool)}, geometry=gpd.points_from_xy(xs, ys), crs=4326)
     return g, lon, lat, pts, hs, area_cell, cell
 
 
@@ -300,9 +303,9 @@ def one_land(cfg, kid, name, g):
     return rows, vil, {"khg_km2_grid": khg_km2, "cell_m": cell, "hs_inside": int(len(hs))}
 
 
-def one(cfg, kid, name, g):
+def one(cfg, kid, name, g, maps=True, whole=False):
     inp, data, oc = cfg["inputs"], Path(cfg["data"]), cfg["overlay"]
-    g, lon, lat, pts, hs, area_cell, cell = base_points(cfg, g)
+    g, lon, lat, pts, hs, area_cell, cell = base_points(cfg, g, whole)
     khg_km2 = len(pts) * area_cell
     peat_total = float(pts["peat"].sum() * area_cell)
 
@@ -392,6 +395,8 @@ def one(cfg, kid, name, g):
                        "ring_hs_now": len(hi_), "ring_hs_now_peat": int(onp[hi_].sum())})
     actors.sort(key=lambda a: (-(a["hs_now"] + a["ring_hs_now"]), -a["area_km2"]))
 
+    if not maps:                              # summary only (all-KHG run): the map layers come from the per-KHG tiles
+        return rows, actors, {"cell_m": cell}, dm_vil
     # map layers
     tol = 0                                   # map layers keep the source geometry
     cl = lambda geoms: shapely.intersection(shapely.make_valid(geoms), g)
@@ -435,13 +440,88 @@ def one(cfg, kid, name, g):
     return rows, actors, mp, dm_vil
 
 
+def _one_all(args):
+    """Worker of --all: one KHG, summary only, cached as <out>/parts/<khg_id>.json (resumable)."""
+    cfg, kid, name, wkb, out, whole = args
+    part = out / "parts" / f"{kid}.json"
+    if part.exists():
+        return kid, "cached"
+    try:
+        rw, ac, mp, dv = one(cfg, kid, name, shapely.from_wkb(wkb), maps=False, whole=whole)
+    except Exception as e:                                   # noqa: BLE001 - one bad KHG must not stop the national run
+        return kid, f"ERR {type(e).__name__}: {str(e)[:200]}"
+    part.parent.mkdir(parents=True, exist_ok=True)
+    tmp = part.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"rows": rw, "actors": ac, "villages": dv, "cell_m": mp.get("cell_m"), "whole_khg": whole}, default=float), encoding="utf-8")
+    tmp.replace(part)
+    return kid, "ok"
+
+
+def main_all(a, cfg):
+    """All KHG of the national registry, summary tables only (no map layers), in parallel; writes <out>/overlay_*.csv."""
+    from concurrent.futures import ProcessPoolExecutor
+    out = Path(a.out)
+    k = P.load_khg(cfg, set(a.only) if a.only else None)
+    k = k[k.khg_id.notna()]
+    fk = out.parent / "final" / "final_khg.csv"          # KHG scored on their whole area (no KLH peat): every point is peat
+    wk = set()
+    if fk.exists():
+        f = pd.read_csv(fk)
+        if "whole_khg" in f:
+            wk = set(f.loc[f.whole_khg.fillna(False).astype(bool), "khg_code"])
+    jobs = [(cfg, kid, nm, shapely.to_wkb(gm), out, kid in wk) for kid, nm, gm in zip(k.khg_id, k.nama, k.geometry.values)]
+    errs = []
+    with ProcessPoolExecutor(a.workers) as ex:
+        for i, (kid, st) in enumerate(ex.map(_one_all, jobs, chunksize=1), 1):
+            if st.startswith("ERR"):
+                errs.append((kid, st)); log.info("%s %s", kid, st)
+            if i % 25 == 0 or i == len(jobs):
+                log.info("%d/%d", i, len(jobs))
+    rows, actors, vrows, whole = [], [], [], []
+    for p in sorted((out / "parts").glob("*.json")):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        if d.get("whole_khg"):
+            whole.append(p.stem)
+        rows += d["rows"]; actors += d["actors"]; vrows += [{"khg_id": p.stem, **v} for v in d["villages"]]
+    write_tables(cfg, out, rows, actors, vrows)
+    (out / "whole_khg.txt").write_text("\n".join(sorted(whole)) + "\n", encoding="utf-8")
+    log.info("%d KHG in %s; %d errors", len(list((out / "parts").glob("*.json"))), out, len(errs))
+    for e in errs[:20]:
+        log.info("  %s", e)
+
+
+def write_tables(cfg, out, rows, actors, vrows):
+    top = cfg["overlay"]["top_actors"]
+    df = pd.DataFrame(rows)
+    num = [c for c in df.columns if df[c].dtype == float]
+    df[num] = df[num].round(4)
+    cols = ["khg_id", "khg", "layer", "class", "label"] + [c for c in df.columns if c not in ("khg_id", "khg", "layer", "class", "label")]
+    df[cols].to_csv(out / "overlay_summary.csv", index=False)
+    ac = pd.DataFrame(actors)
+    if len(ac):
+        if not cfg["overlay"]["company_names"]:
+            ac["company"] = ac.groupby("khg_id").cumcount().map(lambda k: f"licence holder {k + 1}")
+        ac = ac.round(4)
+        ac.to_csv(out / "overlay_actors.csv", index=False)
+        ac.groupby("khg_id").head(top).to_csv(out / "overlay_actors_top.csv", index=False)
+    if vrows:
+        pd.DataFrame(vrows).round(4).to_csv(out / "overlay_dmpg_villages.csv", index=False)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--config", required=True)
     ap.add_argument("--only", nargs="*", help="khg_id to compute (default: all in the stage 3 selection)")
+    ap.add_argument("--all", action="store_true", help="every KHG of the national registry, summary tables only (no map layers)")
+    ap.add_argument("--out", help="output folder for --all (e.g. <national_profile>/overlay_all)")
+    ap.add_argument("--workers", type=int, default=3)
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     cfg = load_cfg(a.config)
+    if a.all:
+        if not a.out:
+            ap.error("--all needs --out")
+        return main_all(a, cfg)
     sel = gpd.read_file(cfg["khg"])
     if a.only:
         sel = sel[sel.khg_id.isin(a.only)]

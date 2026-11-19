@@ -431,6 +431,40 @@ def assemble(data, profiles, out_path, cfg=None):
     print(f"{out_path}: {len(html) / 1e6:.1f} MB, {len(data['khg']['id'])} KHG, {len(profiles)} profiles")
 
 
+def attach_overlay_all(base, profiles):
+    """Land-status tables of every KHG outside the stage 3 set, from `repeat-national-overlay --all` (summary only, no map
+    layers; the profile map draws licences, social forestry and PPTPKH from the per-KHG tiles)."""
+    oa_dir = Path(base) / "overlay_all"
+    if (oa_dir / "overlay_summary.csv").exists():
+        rd = lambda v, nd=2: None if pd.isna(v) else round(float(v), nd)
+        ovs2 = pd.read_csv(oa_dir / "overlay_summary.csv", dtype={"khg_id": str})
+        ova2 = pd.read_csv(oa_dir / "overlay_actors_top.csv", dtype={"khg_id": str}) if (oa_dir / "overlay_actors_top.csv").exists() else pd.DataFrame(columns=["khg_id"])
+        ovv2 = pd.read_csv(oa_dir / "overlay_dmpg_villages.csv", dtype={"khg_id": str}) if (oa_dir / "overlay_dmpg_villages.csv").exists() else pd.DataFrame(columns=["khg_id"])
+        g_s, g_a, g_v = dict(tuple(ovs2.groupby("khg_id"))), dict(tuple(ova2.groupby("khg_id"))), dict(tuple(ovv2.groupby("khg_id")))
+        wf = oa_dir / "whole_khg.txt"
+        wk = set(wf.read_text(encoding="utf-8").split()) if wf.exists() else set()
+        n_add = 0
+        for k, pr in profiles.items():
+            if "ov" in pr or k not in g_s:
+                continue
+            summ = {}
+            for layer, g_ in g_s[k].groupby("layer"):
+                summ[layer] = [[r["class"], rd(r.area_km2), rd(r.peat_km2), rd(r.burned_peat_km2), int(r.hs_now_peat)]
+                               + ([rd(r.lindung_km2), rd(r.forest_protected_km2)] if layer.startswith("licence_") else [])
+                               for _, r in g_.iterrows()]
+            act = [[r.company, r.type, rd(r.area_km2), rd(r.burned_peat_km2), int(r.hs_now_peat), rd(r.lindung_km2),
+                    rd(getattr(r, "ring_burned_peat_km2", None)), int(getattr(r, "ring_hs_now_peat", 0) or 0)]
+                   for r in g_a[k].itertuples()] if k in g_a else []
+            vv = g_v[k].sort_values("area_km2", ascending=False) if k in g_v else None
+            pr["ov"] = {"cell": None, "s": summ, "a": act,
+                        "v": [[r.village, r.kecamatan, r.programme, r.scheme, rd(r.area_km2, 1), rd(r.peat_km2, 1), rd(r.burned_peat_km2, 1), int(r.hs_now_peat)]
+                              for r in vv.itertuples()] if vv is not None else []}
+            if k in wk:
+                pr["ov"]["whole"] = True
+            n_add += 1
+        print(f"land status: {n_add} more KHG from {oa_dir}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", required=True)
@@ -451,6 +485,7 @@ def main(argv=None):
         data, profiles = build(cfg, a.top, out)
         cache.write_text(json.dumps({"data": data, "profiles": profiles}, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     attach_monthly(cfg["out"], profiles)
+    attach_overlay_all(cfg["out"], profiles)
     assemble(data, profiles, out, cfg)
     from repeat_prioritisation.national import fire_page, pages
     pages.build(cfg["out"], data, profiles, Path(out).parent)   # the KHG table and the method page

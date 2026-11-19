@@ -51,10 +51,15 @@ final:                    # repeat-national-final: five dimensions, typology, va
   score_337_without_klh_peat: true   # amendment 2026-11-17, before any result for them: the 10 KHG of the 337 with no KLH peat are scored with the whole KHG as peat (repeat-national-final-whole-khg), against the pool, flagged whole_khg
   dimensions:             # indicators: weight, direction (+ = more of it raises the score); score = weighted mean of percentile ranks
     urgency:              # unchanged from v1
-      u_fire_freq: {weight: 2}        # mean annual burned share of peat, 2015-2025
+      u_fire_freq: {weight: 2}        # mean annual burned share of peat, 2015-2025. Amendment 2026-11-18 (user, before any result): weight 2 -> 1 together with
+                                      #   u_burned_2026; PARKED 2026-11-19 (user): the 2026 Sentinel-2 run was stopped at 34 of 106 tiles, so the three weights stay as before until it is completed;
+                                      #   older burns may have regrown (the ones that did not count in reveg_share), recent burns need attention now
       u_burn_repeat: {weight: 1}      # share burned twice or more
       u_hotspot: {weight: 1}          # VIIRS hotspots per km2 of peat per year, 2012-2025
-      u_hotspot_now: {weight: 1}      # this year's hotspots per km2 of peat
+      u_hotspot_now: {weight: 1}      # this year's hotspots per km2 of peat. Amendment 2026-11-18: 1 -> 0.5 with u_burned_2026 (parked 2026-11-19, see above)
+      u_burned_2026: {weight: 0}      # amendment 2026-11-18 (user, before any result): weight 2, share of the peat burned in 2026, Sentinel-2 (final.burned_s2 below);
+                                      #   parked 2026-11-19 at weight 0 until the national run is complete (partial results in final_inputs/burned_s2/partial_2026.csv);
+                                      #   2026 only, because the reliability of KLHK's burned area is unknown
       damage_share: {weight: 1}       # SKEG 2024 damaged share of peat (PPEG priority area)
       canal_share: {weight: 1}        # canal-affected share of peat (PPEG KET_KANAL)
       u_canal_primary: {weight: 0}    # canal length per km2 of KHG, primary canals (the earlier fire ranking's canal density). Weight 0 by default:
@@ -83,7 +88,7 @@ final:                    # repeat-national-final: five dimensions, typology, va
       villages_peat: {weight: 1}      # 2023 villages with land on the KHG's peat
   reported: [brgm_blocks_per_km2, peat_volume_mm3, tma_deep_share, open_share, forest_share,   # shown, not scored
              reveg_share, burn_recovered_share, burn_unrecovered_share, tmf_forest_2024, tmf_degraded_2024, tmf_deforested_2024, tmf_regrowth_2024,
-             hansen_loss_2015, ndvi_dry, ndmi_dry, ndvi_low_share, sm_root_anom]   # amendment 2026-11-18 (before any result): repeat-national-final-cover and -final-gee
+             hansen_loss_2015, ndvi_dry, ndmi_dry, ndvi_low_share, sm_root_anom, burned_2026_ha]   # amendment 2026-11-18 (before any result): repeat-national-final-cover and -final-gee
   intervention:           # written 2026-11-17 before any result: which intervention each scored KHG needs; independent of the type
     rewetting: {indicator: canal_share, min: 0.20}   # at least 20% of the peat in KLH's canal-influence zones: drained, block the canals
     revegetation: {indicator: reveg_share, min: 0.20} # amendment 2026-11-18, before any result (was open_share): at least 20% of the peat needs replanting,
@@ -92,7 +97,7 @@ final:                    # repeat-national-final: five dimensions, typology, va
     # label: "rewetting and revegetation" if both, "rewetting" or "revegetation" if one, "protect" if neither
     # (peat still mostly forested and undrained). Absolute thresholds, not terciles, so the label means the same in every year.
   flags: {low_feasibility: feasibility, high_exposure: people}       # lowest tercile of feasibility, highest of people; the type is not changed
-  validation: {target: u_burned_now, exclude: [u_hotspot_now]}   # urgency without 2026 hotspots against the 2026 burned share of peat
+  validation: {target: u_burned_now, exclude: [u_hotspot_now, u_burned_2026]}   # urgency without 2026 inputs against the 2026 burned share of peat (KLHK)
   sensitivity: {runs: 500, seed: 20261117}   # every weight times U(0.5, 1.5)
   inputs_layers:          # repeat-national-final-inputs
     rivers: RBI_sungai.gpkg
@@ -110,6 +115,30 @@ final:                    # repeat-national-final: five dimensions, typology, va
     dry_year: 2025
     baseline_years: [2016, 2024]   # SMAP anomaly baseline
     ndvi_low: 0.5                  # NDVI below this in the dry season: open or degraded cover now
+  burned_s2:              # amendment 2026-11-18, written before any result: repeat-national-final-burned (Earth Engine), after Gaveau, Descals & Salim
+                          # (2026, PLOS One 21(4): e0331831) and KLHK's dNBR protocol. Sentinel-2 L2A (COPERNICUS/S2_SR_HARMONIZED), Cloud Score+ cs_cdf >= 0.6
+    year: 2026            # months January to the run date; the last month is partial
+    pre_months: 3         # before image: median NBR of the 3 months before each month (Gaveau et al. 2026)
+    post_percentile: 20   # after image: 20th percentile of the month's NBR (about the second-lowest of ~6 looks; resists a single missed cloud shadow)
+    # burned in month m: pre - post NBR > dnbr_min AND post NBR < post_max, both observed; kept only within viirs_m of a VIIRS (S-NPP, NOAA-20) or
+    # modis_m of a MODIS (FIRMS) fire detection in the 3 months before m or in m (Gaveau et al. 2026 use the same window). Year = union of the months,
+    # then patches below min_patch_ha removed (8-connected, KLHK minimum mapping unit), then counted on KLH peat (dashboard peat outline):
+    # u_burned_2026 = burned peat / peat; burned_2026_ha reported.
+    viirs_m: 500
+    modis_m: 1000
+    min_patch_ha: 6.25
+    scale_m: 20
+    peat_mask_asset: projects/ee-danylaksono/assets/repeat_burned_s2/peat_mask_30m   # the peat outline above, uploaded 2026-11-18; restricts the processing only
+    # Calibration, amended 2026-11-18 (user) before any 2026 result; replaces the 2024/2023 TreeMap calibration (only one test KHG of 2024 had
+    # been computed, to time the method). The grid pairs (dnbr_min x post_max below) are compared with KLHK's 2026 burned area (BA_2026,
+    # file of 15 October 2026) on the same peat, using our months January-September (bands kept separately at no extra reading cost).
+    # KLHK may miss burns, so totals are not matched: the score uses percentile ranks, so the pair with the highest Spearman correlation of the
+    # burned share of peat across the scored KHG is chosen. Reported, not used for choosing: share of KLHK-burned peat we also map, totals
+    # against KLHK and against Nusantara Atlas' published national figure.
+    dnbr_grid: [0.10, 0.15, 0.20, 0.25, 0.30]
+    post_max_grid: [-0.10, 0.10]
+    calibration: klhk_2026
+    calibration_months: 9
 fire_landstatus:          # repeat-national-fire: burned area and hotspots by concession, forest area and DMPG over all of Indonesia
   crs: EPSG:6933          # equal-area grid, so every cell has the same area
   cell_m: 30

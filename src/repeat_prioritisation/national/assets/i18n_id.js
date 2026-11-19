@@ -1,4 +1,5 @@
 const ID={
+"No peat in KLH's peat map: the whole KHG is counted as peat, as in the ranking.":"Tidak ada gambut pada peta gambut KLH: seluruh KHG dihitung sebagai gambut, seperti dalam pemeringkatan.",
 "2026 Bluebook target villages":"Desa sasaran Bluebook 2026",
 "2026 Bluebook target villages; DMPG villages (SiTMAT)":"Desa sasaran Bluebook 2026; desa DMPG (SiTMAT)",
 "Area of KLH peat inside the KHG.":"Luas gambut KLH di dalam KHG.",
